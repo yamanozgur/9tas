@@ -26,7 +26,6 @@ import {
   addDoc,
   deleteDoc,
   serverTimestamp,
-  getDocFromServer,
   Unsubscribe
 } from 'firebase/firestore';
 
@@ -90,17 +89,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     console.warn(`Firestore [${operationType}] warning at ${path}:`, errMessage);
   }
 }
-
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && (error.message.includes('the client is offline') || error.message.includes('closing'))) {
-      console.warn("Firestore connection check note:", error.message);
-    }
-  }
-}
-testConnection();
 
 export interface UserProfile {
   uid: string;
