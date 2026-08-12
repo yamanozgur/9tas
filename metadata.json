@@ -1,0 +1,6 @@
+{
+  "name": "Üç Taş & Dokuz Taş",
+  "description": "Geleneksel Türk zeka ve strateji oyunu Dokuz Taş. Çevrimiçi ve çevrimdışı oynayın!",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

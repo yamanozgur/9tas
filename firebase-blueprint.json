@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "users": {
+      "title": "users",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "isOnline": { "type": "boolean" },
+        "lastSeen": { "type": "string" },
+        "friendIds": { "type": "array", "items": { "type": "string" } },
+        "friendRequestsSent": { "type": "array", "items": { "type": "string" } },
+        "friendRequestsReceived": { "type": "array", "items": { "type": "string" } },
+        "stats": { "type": "object" }
+      },
+      "required": ["uid", "displayName"]
+    },
+    "games": {
+      "title": "games",
+      "type": "object",
+      "properties": {
+        "gameId": { "type": "string" },
+        "gameType": { "type": "string" },
+        "p1Uid": { "type": "string" },
+        "p2Uid": { "type": "string" },
+        "p1Name": { "type": "string" },
+        "p2Name": { "type": "string" },
+        "boardState": { "type": "array" },
+        "phase": { "type": "string" },
+        "currentPlayer": { "type": "string" },
+        "p1Reserve": { "type": "number" },
+        "p2Reserve": { "type": "number" },
+        "p1RemovedCount": { "type": "number" },
+        "p2RemovedCount": { "type": "number" },
+        "winner": { "type": "string" },
+        "status": { "type": "string" },
+        "turnTimestamp": { "type": "number" }
+      },
+      "required": ["gameType", "p1Uid", "status"]
+    },
+    "matchmaking": {
+      "title": "matchmaking",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "gameType": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["uid", "gameType"]
+    },
+    "invitations": {
+      "title": "invitations",
+      "type": "object",
+      "properties": {
+        "senderUid": { "type": "string" },
+        "senderName": { "type": "string" },
+        "receiverUid": { "type": "string" },
+        "receiverName": { "type": "string" },
+        "gameType": { "type": "string" },
+        "status": { "type": "string" },
+        "gameId": { "type": "string" }
+      },
+      "required": ["senderUid", "receiverUid", "gameType", "status"]
+    }
+  }
+}
