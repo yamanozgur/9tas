@@ -1,0 +1,19 @@
+{
+  "short_name": "Üç&DokuzTaş",
+  "name": "Üç Taş & Dokuz Taş Oyunu",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#1a120c",
+  "theme_color": "#7A4219",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "./",
+  "description": "Geleneksel Zeka ve Strateji Oyunu"
+}
