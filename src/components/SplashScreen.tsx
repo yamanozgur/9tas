@@ -63,7 +63,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       handleAuthSuccess(profile);
     } catch (err: any) {
       console.error(err);
-      if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/user-not-found' || err?.code === 'auth/wrong-password') {
+      if (err?.code === 'auth/operation-not-allowed') {
+        setErrorMsg('E-posta/Şifre girişi bu Firebase projesinde kapalı. Lütfen "Google ile Giriş Yap" seçeneğini veya "Misafir" modunu kullanın.');
+      } else if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/user-not-found' || err?.code === 'auth/wrong-password') {
         setErrorMsg('E-posta adresi veya şifre hatalı.');
       } else if (err?.code === 'auth/invalid-email') {
         setErrorMsg('Geçersiz bir e-posta adresi girdiniz.');
@@ -93,7 +95,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       handleAuthSuccess(profile);
     } catch (err: any) {
       console.error(err);
-      if (err?.code === 'auth/email-already-in-use') {
+      if (err?.code === 'auth/operation-not-allowed') {
+        setErrorMsg('E-posta/Şifre kaydı bu Firebase projesinde kapalı. Lütfen "Google ile Kaydol" seçeneğini veya "Misafir" modunu kullanın.');
+      } else if (err?.code === 'auth/email-already-in-use') {
         setErrorMsg('Bu e-posta adresi zaten başka bir hesap tarafından kullanılıyor.');
       } else if (err?.code === 'auth/invalid-email') {
         setErrorMsg('Lütfen geçerli bir e-posta adresi girin.');
@@ -117,7 +121,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       }
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('Google ile giriş yapılırken bir sorun oluştu.');
+      if (err?.code === 'auth/operation-not-allowed') {
+        setErrorMsg('Google ile giriş bu Firebase projesinde etkinleştirilmemiş.');
+      } else if (err?.code === 'auth/popup-closed-by-user') {
+        setErrorMsg('Giriş penceresi kapatıldı.');
+      } else {
+        setErrorMsg('Google ile giriş yapılırken bir sorun oluştu.');
+      }
     } finally {
       setIsLoading(false);
     }
