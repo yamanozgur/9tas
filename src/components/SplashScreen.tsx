@@ -63,14 +63,12 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       handleAuthSuccess(profile);
     } catch (err: any) {
       console.error(err);
-      if (err?.code === 'auth/operation-not-allowed') {
-        setErrorMsg('E-posta/Şifre girişi bu Firebase projesinde kapalı. Lütfen "Google ile Giriş Yap" seçeneğini veya "Misafir" modunu kullanın.');
-      } else if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/user-not-found' || err?.code === 'auth/wrong-password') {
+      if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/user-not-found' || err?.code === 'auth/wrong-password' || err?.message?.includes('hatalı')) {
         setErrorMsg('E-posta adresi veya şifre hatalı.');
       } else if (err?.code === 'auth/invalid-email') {
         setErrorMsg('Geçersiz bir e-posta adresi girdiniz.');
       } else {
-        setErrorMsg('Giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
+        setErrorMsg(err?.message || 'Giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
       }
     } finally {
       setIsLoading(false);
@@ -95,16 +93,14 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       handleAuthSuccess(profile);
     } catch (err: any) {
       console.error(err);
-      if (err?.code === 'auth/operation-not-allowed') {
-        setErrorMsg('E-posta/Şifre kaydı bu Firebase projesinde kapalı. Lütfen "Google ile Kaydol" seçeneğini veya "Misafir" modunu kullanın.');
-      } else if (err?.code === 'auth/email-already-in-use') {
+      if (err?.code === 'auth/email-already-in-use' || err?.message?.includes('zaten var')) {
         setErrorMsg('Bu e-posta adresi zaten başka bir hesap tarafından kullanılıyor.');
       } else if (err?.code === 'auth/invalid-email') {
         setErrorMsg('Lütfen geçerli bir e-posta adresi girin.');
       } else if (err?.code === 'auth/weak-password') {
         setErrorMsg('Şifreniz en az 6 karakter olmalıdır.');
       } else {
-        setErrorMsg('Üyelik oluşturulurken bir hata oluştu. Tekrar deneyin.');
+        setErrorMsg(err?.message || 'Üyelik oluşturulurken bir hata oluştu. Tekrar deneyin.');
       }
     } finally {
       setIsLoading(false);

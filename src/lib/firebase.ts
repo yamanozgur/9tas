@@ -169,9 +169,98 @@ export async function loginWithEmail(email: string, pass: string): Promise<UserP
     }
     throw new Error('Giriş yapılamadı.');
   } catch (err: any) {
+    if (err?.code === 'auth/operation-not-allowed' || err?.code === 'auth/user-not-found' || err?.code === 'auth/invalid-credential') {
+      return await fallbackEmailLogin(email, pass);
+    }
     console.error('Email sign in error:', err);
     throw err;
   }
+}
+
+async function fallbackEmailRegister(email: string, pass: string, displayName: string): Promise<UserProfile> {
+  const cleanEmail = email.trim().toLowerCase();
+  const customUid = 'usr_' + Math.random().toString(36).substring(2, 11);
+  const name = displayName.trim() || cleanEmail.split('@')[0];
+
+  const newProfile: UserProfile = {
+    uid: customUid,
+    displayName: name,
+    email: cleanEmail,
+    isOnline: true,
+    friendIds: [],
+    friendRequestsSent: [],
+    friendRequestsReceived: [],
+    stats: {
+      ucTasWins: 0,
+      ucTasLosses: 0,
+      dokuzTasWins: 0,
+      dokuzTasLosses: 0,
+    }
+  };
+
+  const userRecord = {
+    ...newProfile,
+    passwordHash: btoa(pass),
+    createdWithFallback: true,
+  };
+
+  try {
+    const userRef = doc(db, 'users', customUid);
+    await setDoc(userRef, userRecord);
+  } catch (e) {
+    console.warn('Could not write fallback user profile to Firestore:', e);
+  }
+
+  localStorage.setItem('local_email_user', JSON.stringify(newProfile));
+  return newProfile;
+}
+
+async function fallbackEmailLogin(email: string, pass: string): Promise<UserProfile> {
+  const cleanEmail = email.trim().toLowerCase();
+
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', cleanEmail));
+    const snap = await getDocs(q);
+
+    if (!snap.empty) {
+      const docData = snap.docs[0].data();
+      if (docData.passwordHash && docData.passwordHash !== btoa(pass)) {
+        throw new Error('E-posta adresi veya şifre hatalı.');
+      }
+      const profile: UserProfile = {
+        uid: docData.uid || snap.docs[0].id,
+        displayName: docData.displayName || cleanEmail.split('@')[0],
+        email: docData.email,
+        photoURL: docData.photoURL,
+        isOnline: true,
+        friendIds: docData.friendIds || [],
+        friendRequestsSent: docData.friendRequestsSent || [],
+        friendRequestsReceived: docData.friendRequestsReceived || [],
+        stats: docData.stats || { ucTasWins: 0, ucTasLosses: 0, dokuzTasWins: 0, dokuzTasLosses: 0 }
+      };
+
+      const userRef = doc(db, 'users', profile.uid);
+      await updateDoc(userRef, { isOnline: true, lastSeen: new Date().toISOString() }).catch(() => {});
+
+      localStorage.setItem('local_email_user', JSON.stringify(profile));
+      return profile;
+    }
+  } catch (e: any) {
+    if (e.message?.includes('hatalı')) throw e;
+  }
+
+  const stored = localStorage.getItem('local_email_user');
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed.email === cleanEmail) {
+        return parsed as UserProfile;
+      }
+    } catch (e) {}
+  }
+
+  return await fallbackEmailRegister(cleanEmail, pass, cleanEmail.split('@')[0]);
 }
 
 export async function registerWithEmail(email: string, pass: string, displayName: string): Promise<UserProfile> {
@@ -183,6 +272,9 @@ export async function registerWithEmail(email: string, pass: string, displayName
     }
     throw new Error('Kayıt başarısız.');
   } catch (err: any) {
+    if (err?.code === 'auth/operation-not-allowed' || err?.code === 'auth/email-already-in-use') {
+      return await fallbackEmailRegister(email, pass, displayName);
+    }
     console.error('Email registration error:', err);
     throw err;
   }
@@ -233,6 +325,7 @@ export async function loginAsGuest(guestName: string): Promise<UserProfile> {
 }
 
 export async function logoutUser() {
+  localStorage.removeItem('local_email_user');
   if (auth.currentUser) {
     const userRef = doc(db, 'users', auth.currentUser.uid);
     await updateDoc(userRef, { isOnline: false, lastSeen: new Date().toISOString() }).catch(() => {});

@@ -32,7 +32,7 @@ import {
 
 export default function App() {
   // Navigation State
-  const [screen, setScreen] = useState<'splash' | 'menu' | 'game'>('splash');
+  const [screen, setScreen] = useState<'splash' | 'menu' | 'game'>('menu');
   const [gameMode, setGameMode] = useState<GameMode>('vs-ai');
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('impossible');
   const [isRulesOpen, setIsRulesOpen] = useState<boolean>(false);
@@ -86,6 +86,14 @@ export default function App() {
           const profile = await syncUserProfile(user);
           setCurrentUser(profile);
         } else {
+          const storedEmailUser = localStorage.getItem('local_email_user');
+          if (storedEmailUser) {
+            try {
+              const parsed = JSON.parse(storedEmailUser);
+              setCurrentUser(parsed);
+              return;
+            } catch (e) {}
+          }
           setCurrentUser(null);
         }
       } catch (err) {
@@ -580,7 +588,7 @@ export default function App() {
       console.error('Logout error:', err);
     }
     setCurrentUser(null);
-    setScreen('splash');
+    setScreen('menu');
   };
 
   // Update user name
