@@ -32,7 +32,7 @@ import {
 
 export default function App() {
   // Navigation State
-  const [screen, setScreen] = useState<'splash' | 'menu' | 'game'>('menu');
+  const [screen, setScreen] = useState<'splash' | 'menu' | 'game'>('splash');
   const [gameMode, setGameMode] = useState<GameMode>('vs-ai');
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('impossible');
   const [isRulesOpen, setIsRulesOpen] = useState<boolean>(false);
@@ -588,7 +588,7 @@ export default function App() {
       console.error('Logout error:', err);
     }
     setCurrentUser(null);
-    setScreen('menu');
+    setScreen('splash');
   };
 
   // Update user name
