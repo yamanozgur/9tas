@@ -8,6 +8,7 @@ import {
   User, 
   PlusCircle, 
   LogIn, 
+  LogOut,
   Check, 
   ArrowRight,
   ChevronRight,
@@ -27,6 +28,7 @@ interface ModeSelectionProps {
   onQuickMatch: () => void;
   onOpenRules: () => void;
   onOpenLeaderboard: () => void;
+  onLogout?: () => void;
 }
 
 export const ModeSelection: React.FC<ModeSelectionProps> = ({
@@ -38,6 +40,7 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
   onQuickMatch,
   onOpenRules,
   onOpenLeaderboard,
+  onLogout,
 }) => {
   const [selectedTab, setSelectedTab] = useState<'offline' | 'online'>('offline');
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('impossible');
@@ -123,14 +126,26 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
               </div>
             </div>
 
-            {!isEditingName && (
-              <button
-                onClick={() => setIsEditingName(true)}
-                className="text-xs text-[#7A4219] font-extrabold px-3 py-1.5 bg-[#8B5A2B]/10 border border-[#8B5A2B]/30 rounded-xl hover:bg-[#8B5A2B]/20 transition-colors cursor-pointer shrink-0"
-              >
-                İsim Değiştir
-              </button>
-            )}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {!isEditingName && (
+                <button
+                  onClick={() => setIsEditingName(true)}
+                  className="text-xs text-[#7A4219] font-extrabold px-2.5 py-1.5 bg-[#8B5A2B]/10 border border-[#8B5A2B]/30 rounded-xl hover:bg-[#8B5A2B]/20 transition-colors cursor-pointer shrink-0"
+                >
+                  İsim Değiştir
+                </button>
+              )}
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="text-xs text-red-700 font-extrabold px-2.5 py-1.5 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                  title="Çıkış Yap"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Çıkış Yap</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Optional Google Login Button */}

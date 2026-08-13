@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { 
   LogIn, 
+  LogOut,
   UserPlus, 
   User, 
   Play, 
@@ -25,12 +26,14 @@ interface SplashScreenProps {
   currentUser?: UserProfile | null;
   onStart: () => void;
   onUserAuthenticated?: (user: UserProfile) => void;
+  onLogout?: () => void;
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({
   currentUser,
   onStart,
   onUserAuthenticated,
+  onLogout,
 }) => {
   const [authTab, setAuthTab] = useState<'login' | 'register' | 'guest'>('login');
   const [email, setEmail] = useState<string>('');
@@ -191,13 +194,25 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               <span>Giriş Yapıldı: {currentUser.displayName}</span>
             </div>
-            <button
-              onClick={onStart}
-              className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-[#7A4219] via-[#8B5A2B] to-[#63330F] text-[#FFF8E7] font-black text-sm shadow-md hover:scale-[1.02] active:scale-[0.98] transition-transform flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <span>Oyuna Başla (Dashboard)</span>
-              <ArrowRight className="w-4 h-4 text-[#D4AF37]" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onStart}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-[#7A4219] via-[#8B5A2B] to-[#63330F] text-[#FFF8E7] font-black text-sm shadow-md hover:scale-[1.02] active:scale-[0.98] transition-transform flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Oyuna Başla (Dashboard)</span>
+                <ArrowRight className="w-4 h-4 text-[#D4AF37]" />
+              </button>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="py-3 px-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 font-bold text-xs hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0 shadow-sm"
+                  title="Çıkış Yap"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Çıkış</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
 

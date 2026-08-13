@@ -9,7 +9,7 @@ import { StatsPanel } from './components/StatsPanel';
 import { GameOverModal } from './components/GameOverModal';
 import { RulesModal } from './components/RulesModal';
 import { LeaderboardModal } from './components/LeaderboardModal';
-import { auth, syncUserProfile, UserProfile, loginAsGuest, recordGameResult } from './lib/firebase';
+import { auth, syncUserProfile, UserProfile, loginAsGuest, recordGameResult, logoutUser } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   GameSession,
@@ -76,7 +76,7 @@ export default function App() {
     p2StonesOnBoard: number;
   }[]>([]);
 
-  // 1. Firebase Auth Listener & Default Guest Sync
+  // 1. Firebase Auth Listener & Profile Sync
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       try {
@@ -84,21 +84,10 @@ export default function App() {
           const profile = await syncUserProfile(user);
           setCurrentUser(profile);
         } else {
-          // Auto initialize a guest user if unauthenticated
-          const guest = await loginAsGuest('Oyuncu 1');
-          setCurrentUser(guest);
+          setCurrentUser(null);
         }
       } catch (err) {
         console.error('Firebase Auth/Profile sync error:', err);
-        // Fallback user if offline or Firebase blocked
-        setCurrentUser({
-          uid: 'guest-local-' + Math.random().toString(36).substring(2, 7),
-          displayName: 'Oyuncu 1',
-          isOnline: false,
-          friendIds: [],
-          friendRequestsSent: [],
-          friendRequestsReceived: [],
-        });
       }
     });
     return () => unsub();
@@ -581,6 +570,17 @@ export default function App() {
     }
   };
 
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+    setCurrentUser(null);
+    setScreen('splash');
+  };
+
   // Update user name
   const handleUpdateUserName = async (newName: string) => {
     if (!currentUser) return;
@@ -637,6 +637,7 @@ export default function App() {
             setCurrentUser(profile);
             setScreen('menu');
           }}
+          onLogout={handleLogout}
         />
       )}
 
@@ -657,6 +658,7 @@ export default function App() {
           onQuickMatch={handleQuickMatch}
           onOpenRules={() => setIsRulesOpen(true)}
           onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
+          onLogout={handleLogout}
         />
       )}
 
