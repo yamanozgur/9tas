@@ -35,7 +35,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   onUserAuthenticated,
   onLogout,
 }) => {
-  const [authTab, setAuthTab] = useState<'login' | 'register' | 'guest'>('login');
+  const [authTab, setAuthTab] = useState<'register' | 'login' | 'guest'>('register');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [displayName, setDisplayName] = useState<string>('');
@@ -233,19 +233,6 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
           <div className="grid grid-cols-3 gap-1 p-1 bg-[#FAF6F0] rounded-xl border border-[#7A4219]/15 mb-5 text-xs font-bold">
             <button
               type="button"
-              onClick={() => { setAuthTab('login'); setErrorMsg(null); }}
-              className={`py-2 px-1 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                authTab === 'login'
-                  ? 'bg-[#7A4219] text-[#FFF8E7] shadow-sm'
-                  : 'text-[#6E4223] hover:bg-[#7A4219]/10'
-              }`}
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Giriş Yap</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => { setAuthTab('register'); setErrorMsg(null); }}
               className={`py-2 px-1 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer ${
                 authTab === 'register'
@@ -255,6 +242,19 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             >
               <UserPlus className="w-3.5 h-3.5" />
               <span>Üye Ol</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setAuthTab('login'); setErrorMsg(null); }}
+              className={`py-2 px-1 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                authTab === 'login'
+                  ? 'bg-[#7A4219] text-[#FFF8E7] shadow-sm'
+                  : 'text-[#6E4223] hover:bg-[#7A4219]/10'
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Giriş Yap</span>
             </button>
 
             <button
