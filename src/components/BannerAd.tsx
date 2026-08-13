@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, Info, Volume2, VolumeX, Sparkles, ShieldAlert } from 'lucide-react';
+import { ExternalLink, Info, Volume2, VolumeX, Sparkles, ShieldAlert, Crown } from 'lucide-react';
 
 interface BannerAdProps {
   placement?: 'dashboard' | 'game';
   className?: string;
   isAdFree?: boolean;
+  onOpenAdFreeModal?: () => void;
 }
 
 const SAMPLE_ADS = [
@@ -40,7 +41,12 @@ const SAMPLE_ADS = [
   },
 ];
 
-export const BannerAd: React.FC<BannerAdProps> = ({ placement = 'dashboard', className = '', isAdFree = false }) => {
+export const BannerAd: React.FC<BannerAdProps> = ({ 
+  placement = 'dashboard', 
+  className = '', 
+  isAdFree = false,
+  onOpenAdFreeModal,
+}) => {
   const [adIndex, setAdIndex] = useState(0);
 
   // Rotate ad every 12 seconds
@@ -72,8 +78,19 @@ export const BannerAd: React.FC<BannerAdProps> = ({ placement = 'dashboard', cla
             {placement === 'dashboard' ? 'Sponsorlu Alan' : 'Oyun İçi Reklam'}
           </span>
         </div>
-        <div className="flex items-center gap-1 text-[#A89280]" title="Reklam Seçenekleri">
-          <Info className="w-3 h-3 cursor-pointer hover:text-[#7A4219] transition-colors" />
+        <div className="flex items-center gap-2">
+          {onOpenAdFreeModal && (
+            <button
+              onClick={onOpenAdFreeModal}
+              className="text-[10px] font-black text-amber-800 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <Crown className="w-3 h-3 text-amber-600 fill-amber-300" />
+              <span>Reklamları Kaldır (29.90 ₺)</span>
+            </button>
+          )}
+          <div className="flex items-center text-[#A89280]" title="Reklam Seçenekleri">
+            <Info className="w-3 h-3 cursor-pointer hover:text-[#7A4219] transition-colors" />
+          </div>
         </div>
       </div>
 

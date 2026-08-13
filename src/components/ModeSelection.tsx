@@ -18,7 +18,9 @@ import {
   ShieldCheck,
   Search,
   Swords,
-  Loader2
+  Loader2,
+  Crown,
+  Sparkles
 } from 'lucide-react';
 import { UserProfile, loginWithGoogle, searchUsersByName } from '../lib/firebase';
 import { GameMode, AIDifficulty } from '../types';
@@ -35,6 +37,7 @@ interface ModeSelectionProps {
   onOpenLeaderboard: () => void;
   onLogout?: () => void;
   onOpenAdmin?: () => void;
+  onOpenAdFreeModal?: () => void;
 }
 
 export const ModeSelection: React.FC<ModeSelectionProps> = ({
@@ -48,6 +51,7 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
   onOpenLeaderboard,
   onLogout,
   onOpenAdmin,
+  onOpenAdFreeModal,
 }) => {
   const [selectedTab, setSelectedTab] = useState<'offline' | 'online'>('offline');
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('impossible');
@@ -152,9 +156,17 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
                     </button>
                   </div>
                 ) : (
-                  <h3 className="text-base font-bold text-[#2C1810] truncate">
-                    {currentUser?.displayName || 'Misafir Oyuncu'}
-                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-bold text-[#2C1810] truncate">
+                      {currentUser?.displayName || 'Misafir Oyuncu'}
+                    </h3>
+                    {currentUser?.isAdFree && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 font-black text-[10px] shadow-2xs">
+                        <Sparkles className="w-3 h-3 text-amber-600 fill-amber-300" />
+                        <span>VIP Reklamsız</span>
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -190,6 +202,34 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
               )}
             </div>
           </div>
+
+          {/* Ad-Free Upgrade Banner (If not ad-free) */}
+          {!currentUser?.isAdFree && onOpenAdFreeModal && (
+            <div className="pt-2 border-t border-[#E8DFD5]">
+              <button
+                type="button"
+                onClick={onOpenAdFreeModal}
+                className="w-full p-2.5 rounded-xl bg-gradient-to-r from-[#2C1810] via-[#5C3210] to-[#2C1810] text-[#FFF8E7] shadow-sm hover:brightness-110 active:scale-[0.99] transition-all cursor-pointer flex items-center justify-between border border-[#D4AF37]/40 group"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#B8860B] flex items-center justify-center text-[#2C1810] shadow-xs shrink-0">
+                    <Crown className="w-4 h-4 fill-[#2C1810]/20" />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-xs font-black text-[#FFF8E7] block leading-tight">
+                      Reklamları Kaldır
+                    </span>
+                    <span className="text-[10px] text-[#D4AF37] font-semibold block">
+                      Kesintisiz oyun keyfi için tek seferlik ödeme
+                    </span>
+                  </div>
+                </div>
+                <div className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-black text-xs shadow-xs border border-yellow-200/40 shrink-0 group-hover:scale-105 transition-transform">
+                  29.90 ₺
+                </div>
+              </button>
+            </div>
+          )}
 
           {/* Optional Google Login Button */}
           {!currentUser?.email && (

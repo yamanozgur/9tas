@@ -12,6 +12,7 @@ import { LeaderboardModal } from './components/LeaderboardModal';
 import { AdminPanelModal } from './components/AdminPanelModal';
 import { BannerAd } from './components/BannerAd';
 import { VideoAdModal } from './components/VideoAdModal';
+import { AdFreeModal } from './components/AdFreeModal';
 import { auth, syncUserProfile, UserProfile, loginAsGuest, recordGameResult, logoutUser } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -40,6 +41,7 @@ export default function App() {
   const [isRulesOpen, setIsRulesOpen] = useState<boolean>(false);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState<boolean>(false);
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
+  const [isAdFreeModalOpen, setIsAdFreeModalOpen] = useState<boolean>(false);
 
   // Ads & Game Count State
   const [gamesPlayedCount, setGamesPlayedCount] = useState<number>(() => {
@@ -103,7 +105,21 @@ export default function App() {
               return;
             } catch (e) {}
           }
-          setCurrentUser(null);
+          // Guest check for ad-free
+          const guestAdFree = localStorage.getItem('guest_is_ad_free') === 'true';
+          if (guestAdFree) {
+            setCurrentUser({
+              uid: 'guest_user',
+              displayName: 'Misafir Oyuncu',
+              isOnline: true,
+              isAdFree: true,
+              friendIds: [],
+              friendRequestsSent: [],
+              friendRequestsReceived: [],
+            });
+          } else {
+            setCurrentUser(null);
+          }
         }
       } catch (err) {
         console.error('Firebase Auth/Profile sync error:', err);
@@ -111,6 +127,23 @@ export default function App() {
     });
     return () => unsub();
   }, []);
+
+  const handleAdFreeActivated = () => {
+    setCurrentUser((prev) => {
+      if (prev) {
+        return { ...prev, isAdFree: true };
+      }
+      return {
+        uid: 'guest_user',
+        displayName: 'Misafir Oyuncu',
+        isOnline: true,
+        isAdFree: true,
+        friendIds: [],
+        friendRequestsSent: [],
+        friendRequestsReceived: [],
+      };
+    });
+  };
 
   // 1b. PWA Service Worker Registration
   useEffect(() => {
@@ -690,6 +723,7 @@ export default function App() {
           onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
           onLogout={handleLogout}
           onOpenAdmin={() => setIsAdminOpen(true)}
+          onOpenAdFreeModal={() => setIsAdFreeModalOpen(true)}
         />
       )}
 
@@ -780,7 +814,12 @@ export default function App() {
               </div>
             )}
             {/* Game Screen Banner Ad Slot */}
-            <BannerAd placement="game" className="mt-1 shrink-0" isAdFree={currentUser?.isAdFree} />
+            <BannerAd 
+              placement="game" 
+              className="mt-1 shrink-0" 
+              isAdFree={currentUser?.isAdFree} 
+              onOpenAdFreeModal={() => setIsAdFreeModalOpen(true)}
+            />
           </main>
         </div>
       )}
@@ -826,6 +865,14 @@ export default function App() {
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}
         currentAdminEmail={currentUser?.email || 'yamanozgur@gmail.com'}
+      />
+
+      {/* Ad-Free Membership Modal */}
+      <AdFreeModal
+        isOpen={isAdFreeModalOpen}
+        onClose={() => setIsAdFreeModalOpen(false)}
+        currentUser={currentUser}
+        onAdFreeActivated={handleAdFreeActivated}
       />
 
     </div>
