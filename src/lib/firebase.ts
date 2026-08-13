@@ -385,7 +385,7 @@ export async function removeFriend(currentUid: string, friendUid: string) {
   });
 }
 
-export async function searchUsersByName(searchQuery: string): Promise<UserProfile[]> {
+export async function searchUsersByName(searchQuery: string, currentUid?: string): Promise<UserProfile[]> {
   if (!searchQuery.trim()) return [];
   const usersRef = collection(db, 'users');
   const snap = await getDocs(usersRef);
@@ -394,7 +394,10 @@ export async function searchUsersByName(searchQuery: string): Promise<UserProfil
 
   snap.forEach((docSnap) => {
     const data = docSnap.data() as UserProfile;
-    if (data.displayName && data.displayName.toLowerCase().includes(qLower)) {
+    if (currentUid && data.uid === currentUid) return;
+    const nameMatch = data.displayName && data.displayName.toLowerCase().includes(qLower);
+    const emailMatch = data.email && data.email.toLowerCase().includes(qLower);
+    if (nameMatch || emailMatch) {
       results.push(data);
     }
   });

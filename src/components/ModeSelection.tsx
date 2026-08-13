@@ -15,9 +15,12 @@ import {
   Award,
   Zap,
   Trophy,
-  ShieldCheck
+  ShieldCheck,
+  Search,
+  Swords,
+  Loader2
 } from 'lucide-react';
-import { UserProfile, loginWithGoogle } from '../lib/firebase';
+import { UserProfile, loginWithGoogle, searchUsersByName } from '../lib/firebase';
 import { GameMode, AIDifficulty } from '../types';
 
 interface ModeSelectionProps {
@@ -53,6 +56,30 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
   const [roomCodeInput, setRoomCodeInput] = useState<string>('');
   const [showJoinModal, setShowJoinModal] = useState<boolean>(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(false);
+
+  // Opponent Search state
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [hasSearched, setHasSearched] = useState<boolean>(false);
+
+  const handleSearchUsers = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setHasSearched(false);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const results = await searchUsersByName(query.trim(), currentUser?.uid);
+      setSearchResults(results);
+      setHasSearched(true);
+    } catch (err) {
+      console.error('Error searching users:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const isAdmin = currentUser?.email?.toLowerCase() === 'yamanozgur@gmail.com';
 
@@ -319,30 +346,94 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
               </button>
             </div>
 
-            {/* Room Creation & Joining */}
+            {/* Rakip Ara (Kullanıcı Adı veya E-posta) */}
             <div className="bg-[#FFFDF9] border border-[#D4C3B3] rounded-2xl p-4 flex flex-col gap-3 shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Search className="w-5 h-5 text-[#7A4219]" />
+                  <span className="font-extrabold text-sm text-[#2C1810]">Rakip Ara</span>
+                </div>
+                <span className="text-[11px] text-[#6E4223] font-medium">Kullanıcı adı veya e-posta ile</span>
+              </div>
+
               <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-[#7A4219]" />
-                <span className="font-extrabold text-sm text-[#2C1810]">Özel Oda (Arkadaşınla Oyna)</span>
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      handleSearchUsers(e.target.value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSearchUsers(searchQuery);
+                    }}
+                    placeholder="Kullanıcı adı veya e-posta girin..."
+                    className="w-full bg-[#FAF6F0] border border-[#D4C3B3] rounded-xl py-2.5 pl-3 pr-8 text-xs font-bold text-[#2C1810] focus:outline-none focus:border-[#7A4219]"
+                  />
+                  {isSearching && (
+                    <Loader2 className="w-4 h-4 text-[#7A4219] animate-spin absolute right-2.5 top-3" />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSearchUsers(searchQuery)}
+                  className="px-3.5 py-2.5 bg-[#7A4219] hover:bg-[#8B5A2B] text-[#FFF8E7] font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shrink-0 shadow-xs"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>Ara</span>
+                </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mt-1">
-                <button
-                  onClick={onCreateOnlineRoom}
-                  className="p-3.5 rounded-xl border-2 border-[#D4C3B3] bg-[#FAF6F0] hover:border-[#7A4219] hover:bg-[#7A4219]/10 text-[#2C1810] flex flex-col items-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <PlusCircle className="w-5 h-5 text-[#7A4219]" />
-                  <span className="font-bold text-xs">Oda Oluştur</span>
-                </button>
+              {/* Arama Sonuçları */}
+              {searchResults.length > 0 && (
+                <div className="flex flex-col gap-2 mt-1 max-h-52 overflow-y-auto pr-1">
+                  {searchResults.map((user) => (
+                    <div
+                      key={user.uid}
+                      className="flex items-center justify-between p-2.5 bg-[#FAF6F0] border border-[#E8DFD5] rounded-xl hover:border-[#7A4219]/40 transition-all"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-[#7A4219]/10 border border-[#7A4219]/20 flex items-center justify-center font-bold text-xs text-[#7A4219] shrink-0">
+                          {user.displayName ? user.displayName.slice(0, 2).toUpperCase() : 'OY'}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-extrabold text-xs text-[#2C1810] truncate">
+                              {user.displayName}
+                            </span>
+                            {user.isOnline ? (
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Çevrimiçi" />
+                            ) : (
+                              <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0" title="Çevrimdışı" />
+                            )}
+                          </div>
+                          {user.email && (
+                            <span className="text-[10px] text-[#6E4223] truncate">
+                              {user.email}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                <button
-                  onClick={() => setShowJoinModal(true)}
-                  className="p-3.5 rounded-xl border-2 border-[#D4C3B3] bg-[#FAF6F0] hover:border-[#7A4219] hover:bg-[#7A4219]/10 text-[#2C1810] flex flex-col items-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <LogIn className="w-5 h-5 text-[#7A4219]" />
-                  <span className="font-bold text-xs">Odaya Katıl</span>
-                </button>
-              </div>
+                      <button
+                        type="button"
+                        onClick={onCreateOnlineRoom}
+                        className="px-3 py-1.5 bg-[#7A4219] hover:bg-[#8B5A2B] text-[#FFF8E7] font-extrabold text-xs rounded-lg shadow-xs flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                      >
+                        <Swords className="w-3.5 h-3.5 text-[#D4AF37]" />
+                        <span>Meydan Oku</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {hasSearched && searchResults.length === 0 && !isSearching && (
+                <p className="text-xs text-center text-[#6E4223] italic py-2">
+                  "{searchQuery}" aramasına uygun oyuncu bulunamadı.
+                </p>
+              )}
             </div>
           </motion.div>
         )}
