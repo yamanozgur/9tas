@@ -12,13 +12,18 @@ import {
   AlertCircle, 
   Loader2, 
   CheckCircle2, 
-  ArrowRight 
+  ArrowRight,
+  Eye,
+  EyeOff,
+  KeyRound,
+  X
 } from 'lucide-react';
 import { 
   loginWithEmail, 
   registerWithEmail, 
   loginWithGoogle, 
   loginAsGuest, 
+  resetPasswordEmail,
   UserProfile 
 } from '../lib/firebase';
 
@@ -38,10 +43,42 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   const [authTab, setAuthTab] = useState<'register' | 'login' | 'guest'>('register');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
   const [displayName, setDisplayName] = useState<string>('');
   const [guestName, setGuestName] = useState<string>('Oyuncu 1');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Forgot Password State
+  const [showResetModal, setShowResetModal] = useState<boolean>(false);
+  const [resetEmail, setResetEmail] = useState<string>('');
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSuccess, setResetSuccess] = useState<string | null>(null);
+  const [isResetLoading, setIsResetLoading] = useState<boolean>(false);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) {
+      setResetError('Lütfen e-posta adresinizi girin.');
+      return;
+    }
+    setResetError(null);
+    setResetSuccess(null);
+    setIsResetLoading(true);
+    try {
+      await resetPasswordEmail(resetEmail.trim());
+      setResetSuccess('Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Lütfen gelen kutunuzu kontrol edin.');
+    } catch (err: any) {
+      console.error(err);
+      if (err?.code === 'auth/user-not-found' || err?.code === 'auth/invalid-email') {
+        setResetError('Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı veya e-posta geçersiz.');
+      } else {
+        setResetError('Şifre sıfırlama e-postası gönderilemedi. Lütfen adresi kontrol edin.');
+      }
+    } finally {
+      setIsResetLoading(false);
+    }
+  };
 
   const handleAuthSuccess = (user: UserProfile) => {
     if (onUserAuthenticated) {
@@ -294,17 +331,39 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#7A4219] mb-1">Şifre</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-[#7A4219]">Şifre</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetEmail(email);
+                      setResetError(null);
+                      setResetSuccess(null);
+                      setShowResetModal(true);
+                    }}
+                    className="text-[11px] font-bold text-[#8B5A2B] hover:text-[#7A4219] hover:underline cursor-pointer"
+                  >
+                    Şifremi Unuttum?
+                  </button>
+                </div>
                 <div className="relative">
                   <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8B5A2B]/60" />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[#7A4219]/25 bg-[#FFFDF9] text-sm text-[#2C1810] focus:outline-none focus:ring-2 focus:ring-[#7A4219]/50"
+                    className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-[#7A4219]/25 bg-[#FFFDF9] text-sm text-[#2C1810] focus:outline-none focus:ring-2 focus:ring-[#7A4219]/50"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8B5A2B]/70 hover:text-[#7A4219] p-0.5 cursor-pointer"
+                    title={showPassword ? 'Şifreyi Gizle' : 'Şifreyi Göster'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -385,13 +444,21 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
                 <div className="relative">
                   <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8B5A2B]/60" />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="En az 6 karakter"
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[#7A4219]/25 bg-[#FFFDF9] text-sm text-[#2C1810] focus:outline-none focus:ring-2 focus:ring-[#7A4219]/50"
+                    className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-[#7A4219]/25 bg-[#FFFDF9] text-sm text-[#2C1810] focus:outline-none focus:ring-2 focus:ring-[#7A4219]/50"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8B5A2B]/70 hover:text-[#7A4219] p-0.5 cursor-pointer"
+                    title={showPassword ? 'Şifreyi Gizle' : 'Şifreyi Göster'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -476,6 +543,83 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         </div>
 
       </div>
+
+      {/* Şifremi Unuttum Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#FFFDF9] border-2 border-[#7A4219]/30 rounded-2xl w-full max-w-sm p-5 sm:p-6 shadow-2xl relative flex flex-col gap-4 text-[#2C1810]">
+            <button
+              onClick={() => setShowResetModal(false)}
+              className="absolute top-4 right-4 text-[#8B5A2B] hover:text-[#7A4219] p-1 rounded-lg hover:bg-[#FAF6F0] transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 text-[#7A4219] font-black text-base border-b border-[#7A4219]/15 pb-3">
+              <KeyRound className="w-5 h-5 text-[#D4AF37]" />
+              <span>Şifremi Unuttum</span>
+            </div>
+
+            <p className="text-xs text-[#6E4223] leading-relaxed">
+              Hesabınıza kayıtlı e-posta adresinizi girin. Size şifre sıfırlama bağlantısı içeren bir e-posta göndereceğiz.
+            </p>
+
+            {resetError && (
+              <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{resetError}</span>
+              </div>
+            )}
+
+            {resetSuccess && (
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{resetSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleResetPassword} className="flex flex-col gap-3 mt-1">
+              <div>
+                <label className="block text-xs font-bold text-[#7A4219] mb-1">E-posta Adresiniz</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8B5A2B]/60" />
+                  <input
+                    type="email"
+                    required
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="ornek@email.com"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[#7A4219]/25 bg-[#FAF6F0] text-sm text-[#2C1810] focus:outline-none focus:ring-2 focus:ring-[#7A4219]/50"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowResetModal(false)}
+                  className="flex-1 py-2.5 px-3 rounded-xl border border-[#7A4219]/25 bg-[#FAF6F0] text-[#7A4219] font-bold text-xs hover:bg-[#7A4219]/10 transition-colors cursor-pointer"
+                >
+                  İptal
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isResetLoading}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-[#7A4219] to-[#8B5A2B] text-[#FFF8E7] font-extrabold text-xs shadow-md hover:scale-[1.01] transition-transform flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isResetLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
+                  ) : (
+                    <span>Sıfırlama Gönder</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

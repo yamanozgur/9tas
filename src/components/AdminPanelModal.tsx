@@ -13,9 +13,13 @@ import {
   Check,
   UserX,
   Crown,
-  Trophy
+  Trophy,
+  Sparkles,
+  Loader2,
+  VolumeX,
+  CheckCircle2
 } from 'lucide-react';
-import { fetchAllUsersAdmin, UserProfile } from '../lib/firebase';
+import { fetchAllUsersAdmin, toggleUserAdFreeStatus, UserProfile } from '../lib/firebase';
 
 interface AdminPanelModalProps {
   isOpen: boolean;
@@ -31,8 +35,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [filterType, setFilterType] = useState<'all' | 'online' | 'email' | 'guest'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'online' | 'email' | 'guest' | 'adfree'>('all');
   const [copiedUid, setCopiedUid] = useState<string | null>(null);
+  const [updatingUid, setUpdatingUid] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
 
   const loadUsers = async () => {
     setIsLoading(true);
@@ -60,6 +66,45 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     setTimeout(() => setCopiedUid(null), 2000);
   };
 
+  const handleToggleAdFree = async (targetUser: UserProfile) => {
+    const newStatus = !targetUser.isAdFree;
+    setUpdatingUid(targetUser.uid);
+    try {
+      await toggleUserAdFreeStatus(targetUser.uid, newStatus);
+      
+      // Update local state
+      setUsers((prev) =>
+        prev.map((u) => (u.uid === targetUser.uid ? { ...u, isAdFree: newStatus } : u))
+      );
+
+      // If current logged-in local_email_user is this user, also update localStorage
+      const localEmailUser = localStorage.getItem('local_email_user');
+      if (localEmailUser) {
+        try {
+          const parsed = JSON.parse(localEmailUser);
+          if (parsed.uid === targetUser.uid) {
+            parsed.isAdFree = newStatus;
+            localStorage.setItem('local_email_user', JSON.stringify(parsed));
+          }
+        } catch (e) {}
+      }
+
+      const userName = targetUser.displayName || 'Kullanıcı';
+      setToastMsg({
+        text: newStatus 
+          ? `✨ "${userName}" kullanıcısına reklamsız üyelik tanımlandı!`
+          : `"${userName}" kullanıcısının reklamsız üyeliği kaldırıldı.`,
+        type: newStatus ? 'success' : 'info'
+      });
+      setTimeout(() => setToastMsg(null), 3500);
+    } catch (err) {
+      console.error('Ad-free toggle failed:', err);
+      alert('Reklamsız üyelik durumu güncellenirken bir hata oluştu.');
+    } finally {
+      setUpdatingUid(null);
+    }
+  };
+
   // Filtered users calculation
   const filteredUsers = users.filter((u) => {
     const term = searchTerm.toLowerCase().trim();
@@ -74,6 +119,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     if (filterType === 'online') return u.isOnline;
     if (filterType === 'email') return !!u.email;
     if (filterType === 'guest') return !u.email;
+    if (filterType === 'adfree') return !!u.isAdFree;
     return true;
   });
 
@@ -81,6 +127,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const onlineCount = users.filter((u) => u.isOnline).length;
   const emailUsersCount = users.filter((u) => u.email).length;
   const guestUsersCount = users.filter((u) => !u.email).length;
+  const adFreeCount = users.filter((u) => u.isAdFree).length;
   const totalGamesPlayed = users.reduce((acc, u) => {
     const dtWins = u.stats?.dokuzTasWins || 0;
     const dtLosses = u.stats?.dokuzTasLosses || 0;
@@ -91,7 +138,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-[#FFFDF9] border-2 border-[#7A4219] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-[#2C1810]">
+      <div className="bg-[#FFFDF9] border-2 border-[#7A4219] rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden text-[#2C1810] relative">
         
         {/* Header */}
         <div className="p-4 sm:p-5 bg-gradient-to-r from-[#2C1810] via-[#4A2818] to-[#2C1810] text-[#FFF8E7] flex items-center justify-between border-b border-[#7A4219]/30">
@@ -134,12 +181,27 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
           </div>
         </div>
 
+        {/* Toast Alert Banner */}
+        {toastMsg && (
+          <div className={`px-4 py-2.5 text-xs font-bold flex items-center justify-between animate-in fade-in duration-200 ${
+            toastMsg.type === 'success' 
+              ? 'bg-amber-100 text-amber-900 border-b border-amber-300' 
+              : 'bg-blue-100 text-blue-900 border-b border-blue-300'
+          }`}>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-amber-700" />
+              <span>{toastMsg.text}</span>
+            </div>
+            <button onClick={() => setToastMsg(null)} className="text-xs font-black cursor-pointer opacity-70 hover:opacity-100">✕</button>
+          </div>
+        )}
+
         {/* Content Body */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5">
           
           {/* Stats Overview Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-[#FAF6F0] border border-[#7A4219]/20 p-3.5 rounded-xl shadow-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="bg-[#FAF6F0] border border-[#7A4219]/20 p-3 rounded-xl shadow-sm">
               <div className="flex items-center justify-between text-[#8B5A2B] text-xs font-bold mb-1">
                 <span>Toplam Kullanıcı</span>
                 <Users className="w-4 h-4 text-[#7A4219]" />
@@ -147,7 +209,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               <div className="text-2xl font-black text-[#2C1810] font-serif">{totalUsers}</div>
             </div>
 
-            <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl shadow-sm">
+            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl shadow-sm">
               <div className="flex items-center justify-between text-emerald-700 text-xs font-bold mb-1">
                 <span>Aktif Çevrimiçi</span>
                 <Activity className="w-4 h-4 text-emerald-600 animate-pulse" />
@@ -155,17 +217,25 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               <div className="text-2xl font-black text-emerald-900 font-serif">{onlineCount}</div>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl shadow-sm">
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl shadow-sm">
               <div className="flex items-center justify-between text-amber-800 text-xs font-bold mb-1">
                 <span>E-posta / Misafir</span>
                 <UserCheck className="w-4 h-4 text-amber-700" />
               </div>
-              <div className="text-xl font-black text-amber-900 font-serif">
+              <div className="text-lg font-black text-amber-900 font-serif">
                 {emailUsersCount} <span className="text-xs font-normal text-amber-700">/ {guestUsersCount}</span>
               </div>
             </div>
 
-            <div className="bg-purple-50 border border-purple-200 p-3.5 rounded-xl shadow-sm">
+            <div className="bg-amber-100/60 border border-amber-300 p-3 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between text-amber-900 text-xs font-bold mb-1">
+                <span>Reklamsız Üyeler</span>
+                <Sparkles className="w-4 h-4 text-amber-600 fill-amber-400" />
+              </div>
+              <div className="text-2xl font-black text-amber-900 font-serif">{adFreeCount}</div>
+            </div>
+
+            <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl shadow-sm col-span-2 sm:col-span-1">
               <div className="flex items-center justify-between text-purple-800 text-xs font-bold mb-1">
                 <span>Oynanan Maçlar</span>
                 <Trophy className="w-4 h-4 text-purple-700" />
@@ -199,6 +269,17 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 }`}
               >
                 Tümü ({totalUsers})
+              </button>
+              <button
+                onClick={() => setFilterType('adfree')}
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+                  filterType === 'adfree'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-[#FFFDF9] text-amber-800 hover:bg-amber-50 border border-amber-300'
+                }`}
+              >
+                <Sparkles className="w-3 h-3 fill-amber-300" />
+                <span>Reklamsız ({adFreeCount})</span>
               </button>
               <button
                 onClick={() => setFilterType('online')}
@@ -255,6 +336,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       <th className="py-3 px-4">UID</th>
                       <th className="py-3 px-4 text-center">Dokuz Taş (G/M)</th>
                       <th className="py-3 px-4 text-center">Üç Taş (G/M)</th>
+                      <th className="py-3 px-4 text-center">Reklamsız Üyelik Yönetimi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#7A4219]/10">
@@ -264,9 +346,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       const utWins = u.stats?.ucTasWins || 0;
                       const utLosses = u.stats?.ucTasLosses || 0;
                       const isAdmin = u.email === 'yamanozgur@gmail.com';
+                      const isUserAdFree = !!u.isAdFree;
+                      const isUpdatingThisUser = updatingUid === u.uid;
 
                       return (
-                        <tr key={u.uid} className="hover:bg-[#FAF6F0]/60 transition-colors">
+                        <tr key={u.uid} className={`transition-colors ${isUserAdFree ? 'bg-amber-50/40 hover:bg-amber-50/80' : 'hover:bg-[#FAF6F0]/60'}`}>
                           <td className="py-3 px-4 font-bold text-[#2C1810]">
                             <div className="flex items-center gap-2">
                               <div className="relative">
@@ -296,6 +380,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                                       <Crown className="w-3.5 h-3.5 text-amber-600 fill-amber-400" />
                                     </span>
                                   )}
+                                  {isUserAdFree && (
+                                    <span title="Reklamsız Üye VIP">
+                                      <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-300" />
+                                    </span>
+                                  )}
                                 </span>
                                 <span className="text-[10px] text-[#8B5A2B]/70 font-normal">
                                   {u.isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
@@ -314,7 +403,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
                           <td className="py-3 px-4 font-mono text-[11px] text-[#7A4219]">
                             <div className="flex items-center gap-1">
-                              <span className="truncate max-w-[100px]">{u.uid}</span>
+                              <span className="truncate max-w-[90px]">{u.uid}</span>
                               <button
                                 onClick={() => handleCopy(u.uid)}
                                 className="p-1 hover:bg-[#7A4219]/10 rounded text-[#8B5A2B] transition-colors cursor-pointer"
@@ -336,6 +425,51 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                           <td className="py-3 px-4 text-center font-bold">
                             <span className="text-emerald-700">{utWins}G</span> / <span className="text-red-700">{utLosses}M</span>
                           </td>
+
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              {isUserAdFree ? (
+                                <>
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 font-black text-[10px] shadow-xs">
+                                    <Sparkles className="w-3 h-3 text-amber-600 fill-amber-400" />
+                                    <span>Reklamsız (VIP)</span>
+                                  </span>
+                                  <button
+                                    onClick={() => handleToggleAdFree(u)}
+                                    disabled={isUpdatingThisUser}
+                                    className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[10px] border border-red-200 transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                                    title="Reklamsız üyeliği kaldır"
+                                  >
+                                    {isUpdatingThisUser ? (
+                                      <Loader2 className="w-3 h-3 animate-spin text-red-700" />
+                                    ) : (
+                                      <VolumeX className="w-3 h-3" />
+                                    )}
+                                    <span>Kaldır</span>
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 font-bold text-[10px]">
+                                    <span>Standart</span>
+                                  </span>
+                                  <button
+                                    onClick={() => handleToggleAdFree(u)}
+                                    disabled={isUpdatingThisUser}
+                                    className="px-3 py-1 rounded-lg bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-600 hover:brightness-110 text-white font-black text-[10px] shadow-xs transition-all cursor-pointer flex items-center gap-1 border border-amber-400/40 active:scale-95 disabled:opacity-50"
+                                    title="Kullanıcıya reklamsız üyelik tanımla"
+                                  >
+                                    {isUpdatingThisUser ? (
+                                      <Loader2 className="w-3 h-3 animate-spin text-white" />
+                                    ) : (
+                                      <Sparkles className="w-3 h-3 text-yellow-100 fill-yellow-200" />
+                                    )}
+                                    <span>Reklamsız Yap</span>
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       );
                     })}
@@ -349,7 +483,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
         {/* Footer */}
         <div className="p-3 sm:p-4 bg-[#FAF6F0] border-t border-[#7A4219]/15 flex items-center justify-between text-xs text-[#8B5A2B]">
-          <span>Görüntülenen: {filteredUsers.length} / {totalUsers} Kullanıcı</span>
+          <span>Görüntülenen: {filteredUsers.length} / {totalUsers} Kullanıcı ({adFreeCount} Reklamsız Üye)</span>
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl bg-[#7A4219] text-[#FFF8E7] font-bold hover:bg-[#8B5A2B] transition-colors cursor-pointer shadow-sm"

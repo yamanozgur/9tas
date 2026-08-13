@@ -4,6 +4,7 @@ import { ExternalLink, Info, Volume2, VolumeX, Sparkles, ShieldAlert } from 'luc
 interface BannerAdProps {
   placement?: 'dashboard' | 'game';
   className?: string;
+  isAdFree?: boolean;
 }
 
 const SAMPLE_ADS = [
@@ -39,16 +40,21 @@ const SAMPLE_ADS = [
   },
 ];
 
-export const BannerAd: React.FC<BannerAdProps> = ({ placement = 'dashboard', className = '' }) => {
+export const BannerAd: React.FC<BannerAdProps> = ({ placement = 'dashboard', className = '', isAdFree = false }) => {
   const [adIndex, setAdIndex] = useState(0);
 
   // Rotate ad every 12 seconds
   useEffect(() => {
+    if (isAdFree) return;
     const timer = setInterval(() => {
       setAdIndex((prev) => (prev + 1) % SAMPLE_ADS.length);
     }, 12000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isAdFree]);
+
+  if (isAdFree) {
+    return null;
+  }
 
   const currentAd = SAMPLE_ADS[adIndex];
 

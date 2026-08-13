@@ -8,6 +8,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile, 
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
   User 
@@ -99,6 +100,7 @@ export interface UserProfile {
   photoURL?: string;
   isOnline: boolean;
   lastSeen?: string;
+  isAdFree?: boolean;
   friendIds: string[];
   friendRequestsSent: string[];
   friendRequestsReceived: string[];
@@ -234,6 +236,7 @@ async function fallbackEmailLogin(email: string, pass: string): Promise<UserProf
         email: docData.email,
         photoURL: docData.photoURL,
         isOnline: true,
+        isAdFree: !!docData.isAdFree,
         friendIds: docData.friendIds || [],
         friendRequestsSent: docData.friendRequestsSent || [],
         friendRequestsReceived: docData.friendRequestsReceived || [],
@@ -276,6 +279,16 @@ export async function registerWithEmail(email: string, pass: string, displayName
       return await fallbackEmailRegister(email, pass, displayName);
     }
     console.error('Email registration error:', err);
+    throw err;
+  }
+}
+
+export async function resetPasswordEmail(email: string): Promise<void> {
+  const cleanEmail = email.trim();
+  try {
+    await sendPasswordResetEmail(auth, cleanEmail);
+  } catch (err: any) {
+    console.error('Reset password email error:', err);
     throw err;
   }
 }
@@ -423,6 +436,17 @@ export async function fetchAllUsersAdmin(): Promise<UserProfile[]> {
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'users');
     return [];
+  }
+}
+
+export async function toggleUserAdFreeStatus(uid: string, isAdFree: boolean): Promise<void> {
+  try {
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, {
+      isAdFree: isAdFree
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `users/${uid}`);
   }
 }
 

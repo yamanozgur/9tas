@@ -163,11 +163,11 @@ export default function App() {
     if (winner) {
       setIsGameOverModalOpen(true);
 
-      // Increment played games counter & check for 5th game video ad
+      // Increment played games counter & check for 5th game video ad (skip if user has ad-free status)
       setGamesPlayedCount((prev) => {
         const next = prev + 1;
         localStorage.setItem('dokuztas_played_games_count', next.toString());
-        if (next % 5 === 0) {
+        if (next % 5 === 0 && !currentUser?.isAdFree) {
           setIsVideoAdOpen(true);
         }
         return next;
@@ -780,7 +780,7 @@ export default function App() {
               </div>
             )}
             {/* Game Screen Banner Ad Slot */}
-            <BannerAd placement="game" className="mt-1 shrink-0" />
+            <BannerAd placement="game" className="mt-1 shrink-0" isAdFree={currentUser?.isAdFree} />
           </main>
         </div>
       )}

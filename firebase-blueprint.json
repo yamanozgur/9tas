@@ -10,6 +10,7 @@
         "photoURL": { "type": "string" },
         "isOnline": { "type": "boolean" },
         "lastSeen": { "type": "string" },
+        "isAdFree": { "type": "boolean" },
         "friendIds": { "type": "array", "items": { "type": "string" } },
         "friendRequestsSent": { "type": "array", "items": { "type": "string" } },
         "friendRequestsReceived": { "type": "array", "items": { "type": "string" } },

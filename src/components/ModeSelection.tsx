@@ -469,7 +469,7 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
         </div>
 
         {/* Dashboard Banner Ad Slot */}
-        <BannerAd placement="dashboard" className="mt-3" />
+        <BannerAd placement="dashboard" className="mt-3" isAdFree={currentUser?.isAdFree} />
 
       </div>
 
