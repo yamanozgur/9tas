@@ -628,9 +628,16 @@ export default function App() {
   return (
     <div className="min-h-screen w-full bg-light-theme text-[#2C1810] flex flex-col items-center justify-between font-sans selection:bg-[#7A4219] selection:text-[#FFF8E7]">
       
-      {/* 1. SPLASH SCREEN */}
+      {/* 1. SPLASH / AUTHENTICATION LANDING SCREEN */}
       {screen === 'splash' && (
-        <SplashScreen onStart={() => setScreen('menu')} />
+        <SplashScreen 
+          currentUser={currentUser}
+          onStart={() => setScreen('menu')} 
+          onUserAuthenticated={(profile) => {
+            setCurrentUser(profile);
+            setScreen('menu');
+          }}
+        />
       )}
 
       {/* 2. USER ENTRY & MODE SELECTION SCREEN */}

@@ -5,6 +5,8 @@ import {
   GoogleAuthProvider, 
   signInWithPopup, 
   signInAnonymously, 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   updateProfile, 
   signOut,
   onAuthStateChanged,
@@ -146,7 +148,7 @@ export async function syncUserProfile(user: User, customName?: string): Promise<
   }
 }
 
-// Login Helper (Google or Custom Display Name Anonymous Login)
+// Login Helper (Google, Email/Password, or Custom Display Name Anonymous Login)
 export async function loginWithGoogle() {
   try {
     const result = await signInWithPopup(auth, googleProvider);
@@ -155,6 +157,33 @@ export async function loginWithGoogle() {
     }
   } catch (err) {
     console.error('Google Sign in failed:', err);
+    throw err;
+  }
+}
+
+export async function loginWithEmail(email: string, pass: string): Promise<UserProfile> {
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, pass);
+    if (cred.user) {
+      return await syncUserProfile(cred.user);
+    }
+    throw new Error('Giriş yapılamadı.');
+  } catch (err: any) {
+    console.error('Email sign in error:', err);
+    throw err;
+  }
+}
+
+export async function registerWithEmail(email: string, pass: string, displayName: string): Promise<UserProfile> {
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    if (cred.user) {
+      await updateProfile(cred.user, { displayName });
+      return await syncUserProfile(cred.user, displayName);
+    }
+    throw new Error('Kayıt başarısız.');
+  } catch (err: any) {
+    console.error('Email registration error:', err);
     throw err;
   }
 }
