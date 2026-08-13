@@ -387,22 +387,27 @@ export async function removeFriend(currentUid: string, friendUid: string) {
 
 export async function searchUsersByName(searchQuery: string, currentUid?: string): Promise<UserProfile[]> {
   if (!searchQuery.trim()) return [];
-  const usersRef = collection(db, 'users');
-  const snap = await getDocs(usersRef);
-  const results: UserProfile[] = [];
-  const qLower = searchQuery.toLowerCase().trim();
+  try {
+    const usersRef = collection(db, 'users');
+    const snap = await getDocs(usersRef);
+    const results: UserProfile[] = [];
+    const qLower = searchQuery.toLowerCase().trim();
 
-  snap.forEach((docSnap) => {
-    const data = docSnap.data() as UserProfile;
-    if (currentUid && data.uid === currentUid) return;
-    const nameMatch = data.displayName && data.displayName.toLowerCase().includes(qLower);
-    const emailMatch = data.email && data.email.toLowerCase().includes(qLower);
-    if (nameMatch || emailMatch) {
-      results.push(data);
-    }
-  });
+    snap.forEach((docSnap) => {
+      const data = docSnap.data() as UserProfile;
+      if (currentUid && data.uid === currentUid) return;
+      const nameMatch = data.displayName && data.displayName.toLowerCase().includes(qLower);
+      const emailMatch = data.email && data.email.toLowerCase().includes(qLower);
+      if (nameMatch || emailMatch) {
+        results.push(data);
+      }
+    });
 
-  return results.slice(0, 10);
+    return results.slice(0, 10);
+  } catch (err) {
+    console.warn("Error searching users in Firestore:", err);
+    return [];
+  }
 }
 
 export async function fetchAllUsersAdmin(): Promise<UserProfile[]> {

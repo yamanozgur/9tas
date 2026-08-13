@@ -10,6 +10,8 @@ import { GameOverModal } from './components/GameOverModal';
 import { RulesModal } from './components/RulesModal';
 import { LeaderboardModal } from './components/LeaderboardModal';
 import { AdminPanelModal } from './components/AdminPanelModal';
+import { BannerAd } from './components/BannerAd';
+import { VideoAdModal } from './components/VideoAdModal';
 import { auth, syncUserProfile, UserProfile, loginAsGuest, recordGameResult, logoutUser } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -38,6 +40,13 @@ export default function App() {
   const [isRulesOpen, setIsRulesOpen] = useState<boolean>(false);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState<boolean>(false);
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
+
+  // Ads & Game Count State
+  const [gamesPlayedCount, setGamesPlayedCount] = useState<number>(() => {
+    const saved = localStorage.getItem('dokuztas_played_games_count');
+    return saved ? parseInt(saved, 10) || 0 : 0;
+  });
+  const [isVideoAdOpen, setIsVideoAdOpen] = useState<boolean>(false);
 
   // User Profile
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -149,10 +158,21 @@ export default function App() {
     return () => unsub();
   }, [activeOnlineGameId, currentUser]);
 
-  // 3. Record Game Result to Firestore Stats & Open Modal
+  // 3. Record Game Result to Firestore Stats, Increment Game Count & Trigger 5-Game Video Ad
   useEffect(() => {
     if (winner) {
       setIsGameOverModalOpen(true);
+
+      // Increment played games counter & check for 5th game video ad
+      setGamesPlayedCount((prev) => {
+        const next = prev + 1;
+        localStorage.setItem('dokuztas_played_games_count', next.toString());
+        if (next % 5 === 0) {
+          setIsVideoAdOpen(true);
+        }
+        return next;
+      });
+
       if (currentUser?.uid) {
         if (winner === 'P1') {
           recordGameResult(currentUser.uid);
@@ -162,7 +182,7 @@ export default function App() {
         }
       }
     }
-  }, [winner, currentUser, gameMode, onlineSession]);
+  }, [winner]);
 
   // Reset local game state
   const resetLocalGame = useCallback(() => {
@@ -759,9 +779,18 @@ export default function App() {
                 </div>
               </div>
             )}
+            {/* Game Screen Banner Ad Slot */}
+            <BannerAd placement="game" className="mt-1 shrink-0" />
           </main>
         </div>
       )}
+
+      {/* Interstitial Video Ad Modal (Triggers every 5 games) */}
+      <VideoAdModal
+        isOpen={isVideoAdOpen}
+        gameCount={gamesPlayedCount}
+        onClose={() => setIsVideoAdOpen(false)}
+      />
 
       {/* Game Over Modal */}
       {isGameOverModalOpen && (

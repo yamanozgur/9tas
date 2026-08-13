@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, loginWithGoogle, searchUsersByName } from '../lib/firebase';
 import { GameMode, AIDifficulty } from '../types';
+import { BannerAd } from './BannerAd';
 
 interface ModeSelectionProps {
   currentUser: UserProfile | null;
@@ -466,6 +467,9 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
             </button>
           )}
         </div>
+
+        {/* Dashboard Banner Ad Slot */}
+        <BannerAd placement="dashboard" className="mt-3" />
 
       </div>
 
