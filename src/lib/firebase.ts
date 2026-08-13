@@ -309,6 +309,22 @@ export async function searchUsersByName(searchQuery: string): Promise<UserProfil
   return results.slice(0, 10);
 }
 
+export async function fetchAllUsersAdmin(): Promise<UserProfile[]> {
+  try {
+    const usersRef = collection(db, 'users');
+    const snap = await getDocs(usersRef);
+    const users: UserProfile[] = [];
+    snap.forEach((docSnap) => {
+      const data = docSnap.data() as UserProfile;
+      users.push(data);
+    });
+    return users;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, 'users');
+    return [];
+  }
+}
+
 // Leaderboard & Game Stats Sync
 export async function getLeaderboard(): Promise<UserProfile[]> {
   try {

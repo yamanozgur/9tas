@@ -14,7 +14,8 @@ import {
   ChevronRight,
   Award,
   Zap,
-  Trophy
+  Trophy,
+  ShieldCheck
 } from 'lucide-react';
 import { UserProfile, loginWithGoogle } from '../lib/firebase';
 import { GameMode, AIDifficulty } from '../types';
@@ -29,6 +30,7 @@ interface ModeSelectionProps {
   onOpenRules: () => void;
   onOpenLeaderboard: () => void;
   onLogout?: () => void;
+  onOpenAdmin?: () => void;
 }
 
 export const ModeSelection: React.FC<ModeSelectionProps> = ({
@@ -41,6 +43,7 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
   onOpenRules,
   onOpenLeaderboard,
   onLogout,
+  onOpenAdmin,
 }) => {
   const [selectedTab, setSelectedTab] = useState<'offline' | 'online'>('offline');
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('impossible');
@@ -50,6 +53,8 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
   const [roomCodeInput, setRoomCodeInput] = useState<string>('');
   const [showJoinModal, setShowJoinModal] = useState<boolean>(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(false);
+
+  const isAdmin = currentUser?.email?.toLowerCase() === 'yamanozgur@gmail.com';
 
   const handleSaveName = async () => {
     if (!guestNameInput.trim()) return;
@@ -127,6 +132,16 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
+              {isAdmin && onOpenAdmin && (
+                <button
+                  onClick={onOpenAdmin}
+                  className="text-xs text-[#2C1810] font-black px-2.5 py-1.5 bg-[#D4AF37] border border-[#B8860B] rounded-xl hover:bg-[#B8860B] hover:text-white transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-xs"
+                  title="Yönetici Paneli"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Admin</span>
+                </button>
+              )}
               {!isEditingName && (
                 <button
                   onClick={() => setIsEditingName(true)}
@@ -332,8 +347,8 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
           </motion.div>
         )}
 
-        {/* Footer Links (Leaderboard & Rules) */}
-        <div className="flex items-center justify-center gap-4 pt-2">
+        {/* Footer Links (Leaderboard, Rules & Admin) */}
+        <div className="flex items-center justify-center gap-3 pt-2 flex-wrap">
           <button
             onClick={onOpenLeaderboard}
             className="text-xs font-bold text-[#7A4219] hover:text-[#5C3210] bg-[#FFFDF9] border border-[#D4C3B3] px-3 py-1.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer transition-colors"
@@ -349,6 +364,16 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
             <Award className="w-4 h-4 text-[#7A4219]" />
             <span>Kurallar</span>
           </button>
+
+          {isAdmin && onOpenAdmin && (
+            <button
+              onClick={onOpenAdmin}
+              className="text-xs font-black text-[#2C1810] bg-[#D4AF37] border border-[#B8860B] px-3 py-1.5 rounded-xl shadow-sm inline-flex items-center gap-1.5 cursor-pointer hover:bg-[#B8860B] hover:text-white transition-colors"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Admin Paneli</span>
+            </button>
+          )}
         </div>
 
       </div>

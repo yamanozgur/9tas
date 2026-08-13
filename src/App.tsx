@@ -9,6 +9,7 @@ import { StatsPanel } from './components/StatsPanel';
 import { GameOverModal } from './components/GameOverModal';
 import { RulesModal } from './components/RulesModal';
 import { LeaderboardModal } from './components/LeaderboardModal';
+import { AdminPanelModal } from './components/AdminPanelModal';
 import { auth, syncUserProfile, UserProfile, loginAsGuest, recordGameResult, logoutUser } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -36,6 +37,7 @@ export default function App() {
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('impossible');
   const [isRulesOpen, setIsRulesOpen] = useState<boolean>(false);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState<boolean>(false);
+  const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
 
   // User Profile
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -659,6 +661,7 @@ export default function App() {
           onOpenRules={() => setIsRulesOpen(true)}
           onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
           onLogout={handleLogout}
+          onOpenAdmin={() => setIsAdminOpen(true)}
         />
       )}
 
@@ -779,6 +782,13 @@ export default function App() {
         isOpen={isLeaderboardOpen}
         onClose={() => setIsLeaderboardOpen(false)}
         currentUserUid={currentUser?.uid}
+      />
+
+      {/* Admin Panel Modal */}
+      <AdminPanelModal
+        isOpen={isAdminOpen}
+        onClose={() => setIsAdminOpen(false)}
+        currentAdminEmail={currentUser?.email || 'yamanozgur@gmail.com'}
       />
 
     </div>
