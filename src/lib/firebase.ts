@@ -99,7 +99,7 @@ export interface UserProfile {
   email?: string;
   photoURL?: string;
   isOnline: boolean;
-  lastSeen?: string;
+  lastSeen?: string | number;
   isAdFree?: boolean;
   friendIds: string[];
   friendRequestsSent: string[];
@@ -112,6 +112,75 @@ export interface UserProfile {
   };
 }
 
+/**
+ * Checks if a user is currently active/online based on a heartbeat within the last 60 seconds.
+ */
+export function isUserCurrentlyOnline(user?: UserProfile | { isOnline?: boolean; lastSeen?: string | number } | null): boolean {
+  if (!user) return false;
+  if (user.isOnline === false) return false;
+  if (!user.lastSeen) return false;
+
+  const lastSeenMs = typeof user.lastSeen === 'number' 
+    ? user.lastSeen 
+    : new Date(user.lastSeen).getTime();
+
+  if (isNaN(lastSeenMs)) return false;
+  const now = Date.now();
+  const diff = now - lastSeenMs;
+  // Consider user online if heartbeat was within the last 60 seconds
+  return diff >= 0 && diff <= 60000;
+}
+
+/**
+ * Formats lastSeen timestamp into human readable Turkish relative time
+ */
+export function formatLastSeen(lastSeen?: string | number): string {
+  if (!lastSeen) return 'Bilinmiyor';
+  const time = typeof lastSeen === 'number' ? lastSeen : new Date(lastSeen).getTime();
+  if (isNaN(time)) return 'Bilinmiyor';
+  
+  const diffSec = Math.floor((Date.now() - time) / 1000);
+  if (diffSec < 60) return 'Şimdi aktif';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} dk önce`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} saat önce`;
+  const days = Math.floor(diffSec / 86400);
+  if (days === 1) return 'Dün';
+  if (days < 7) return `${days} gün önce`;
+  return new Date(time).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * Periodically called from active clients to signal presence in Firestore
+ */
+export async function updateUserPresenceHeartbeat(uid: string, isOnline: boolean = true) {
+  if (!uid || uid === 'guest_user') return;
+  try {
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, {
+      isOnline,
+      lastSeen: new Date().toISOString(),
+    });
+  } catch (err) {
+    // Silently ignore permission/network errors
+  }
+}
+
+/**
+ * Marks user offline when tab/browser is closed or user logs out
+ */
+export async function setUserOffline(uid: string) {
+  if (!uid || uid === 'guest_user') return;
+  try {
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, {
+      isOnline: false,
+      lastSeen: new Date().toISOString(),
+    });
+  } catch (err) {
+    // Silently ignore
+  }
+}
+
 // User Profile Firestore Sync
 export async function syncUserProfile(user: User, customName?: string): Promise<UserProfile> {
   const userRef = doc(db, 'users', user.uid);
@@ -119,6 +188,7 @@ export async function syncUserProfile(user: User, customName?: string): Promise<
 
   const name = customName || user.displayName || `Oyuncu-${user.uid.slice(0, 5)}`;
   const photo = user.photoURL || '';
+  const nowIso = new Date().toISOString();
 
   if (!snap.exists()) {
     const newProfile: UserProfile = {
@@ -127,6 +197,7 @@ export async function syncUserProfile(user: User, customName?: string): Promise<
       email: user.email || undefined,
       photoURL: photo,
       isOnline: true,
+      lastSeen: nowIso,
       friendIds: [],
       friendRequestsSent: [],
       friendRequestsReceived: [],
@@ -142,7 +213,7 @@ export async function syncUserProfile(user: User, customName?: string): Promise<
   } else {
     await updateDoc(userRef, {
       isOnline: true,
-      lastSeen: new Date().toISOString(),
+      lastSeen: nowIso,
       ...(customName ? { displayName: customName } : {})
     });
     const updatedSnap = await getDoc(userRef);
@@ -183,12 +254,14 @@ async function fallbackEmailRegister(email: string, pass: string, displayName: s
   const cleanEmail = email.trim().toLowerCase();
   const customUid = 'usr_' + Math.random().toString(36).substring(2, 11);
   const name = displayName.trim() || cleanEmail.split('@')[0];
+  const nowIso = new Date().toISOString();
 
   const newProfile: UserProfile = {
     uid: customUid,
     displayName: name,
     email: cleanEmail,
     isOnline: true,
+    lastSeen: nowIso,
     friendIds: [],
     friendRequestsSent: [],
     friendRequestsReceived: [],
@@ -311,10 +384,12 @@ export async function loginAsGuest(guestName: string): Promise<UserProfile> {
     localStorage.setItem('local_guest_uid', localGuestUid);
   }
 
+  const nowIso = new Date().toISOString();
   const localProfile: UserProfile = {
     uid: localGuestUid,
     displayName: guestName,
     isOnline: true,
+    lastSeen: nowIso,
     friendIds: [],
     friendRequestsSent: [],
     friendRequestsReceived: [],
@@ -412,7 +487,10 @@ export async function searchUsersByName(searchQuery: string, currentUid?: string
       const nameMatch = data.displayName && data.displayName.toLowerCase().includes(qLower);
       const emailMatch = data.email && data.email.toLowerCase().includes(qLower);
       if (nameMatch || emailMatch) {
-        results.push(data);
+        results.push({
+          ...data,
+          isOnline: isUserCurrentlyOnline(data),
+        });
       }
     });
 
@@ -428,10 +506,30 @@ export async function fetchAllUsersAdmin(): Promise<UserProfile[]> {
     const usersRef = collection(db, 'users');
     const snap = await getDocs(usersRef);
     const users: UserProfile[] = [];
+    const staleUpdates: Promise<void>[] = [];
+
     snap.forEach((docSnap) => {
       const data = docSnap.data() as UserProfile;
-      users.push(data);
+      const realOnline = isUserCurrentlyOnline(data);
+
+      // If document was stored as isOnline: true in database, but user has gone offline/idle
+      if (data.isOnline && !realOnline) {
+        staleUpdates.push(
+          updateDoc(doc(db, 'users', data.uid), { isOnline: false }).catch(() => {})
+        );
+      }
+
+      users.push({
+        ...data,
+        isOnline: realOnline,
+      });
     });
+
+    // Fire non-blocking cleanup of stale isOnline flags in Firestore
+    if (staleUpdates.length > 0) {
+      Promise.all(staleUpdates).catch(() => {});
+    }
+
     return users;
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'users');

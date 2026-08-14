@@ -13,7 +13,16 @@ import { AdminPanelModal } from './components/AdminPanelModal';
 import { BannerAd } from './components/BannerAd';
 import { VideoAdModal } from './components/VideoAdModal';
 import { AdFreeModal } from './components/AdFreeModal';
-import { auth, syncUserProfile, UserProfile, loginAsGuest, recordGameResult, logoutUser } from './lib/firebase';
+import { 
+  auth, 
+  syncUserProfile, 
+  UserProfile, 
+  loginAsGuest, 
+  recordGameResult, 
+  logoutUser,
+  updateUserPresenceHeartbeat,
+  setUserOffline 
+} from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   GameSession,
@@ -145,7 +154,46 @@ export default function App() {
     });
   };
 
-  // 1b. PWA Service Worker Registration
+  // 1b. Active Presence Heartbeat & Auto Offline Cleanup
+  useEffect(() => {
+    if (!currentUser || !currentUser.uid || currentUser.uid === 'guest_user') return;
+
+    const uid = currentUser.uid;
+
+    // Send immediate heartbeat
+    updateUserPresenceHeartbeat(uid, true);
+
+    // Heartbeat every 25 seconds
+    const interval = setInterval(() => {
+      updateUserPresenceHeartbeat(uid, true);
+    }, 25000);
+
+    const handleBeforeUnload = () => {
+      setUserOffline(uid);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateUserPresenceHeartbeat(uid, true);
+      } else {
+        setUserOffline(uid);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      setUserOffline(uid);
+    };
+  }, [currentUser?.uid]);
+
+  // 1c. PWA Service Worker Registration
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});

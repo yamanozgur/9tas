@@ -22,7 +22,7 @@ import {
   Crown,
   Sparkles
 } from 'lucide-react';
-import { UserProfile, loginWithGoogle, searchUsersByName } from '../lib/firebase';
+import { UserProfile, loginWithGoogle, searchUsersByName, formatLastSeen } from '../lib/firebase';
 import { GameMode, AIDifficulty } from '../types';
 import { BannerAd } from './BannerAd';
 
@@ -446,14 +446,17 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
                             {user.isOnline ? (
                               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Çevrimiçi" />
                             ) : (
-                              <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0" title="Çevrimdışı" />
+                              <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0" title={`Son görülme: ${formatLastSeen(user.lastSeen)}`} />
                             )}
                           </div>
-                          {user.email && (
-                            <span className="text-[10px] text-[#6E4223] truncate">
-                              {user.email}
-                            </span>
-                          )}
+                          <span className="text-[10px] text-[#6E4223] truncate flex items-center gap-1">
+                            {user.isOnline ? (
+                              <span className="text-emerald-700 font-semibold">Çevrimiçi</span>
+                            ) : (
+                              <span>{formatLastSeen(user.lastSeen)}</span>
+                            )}
+                            {user.email && <span>• {user.email}</span>}
+                          </span>
                         </div>
                       </div>
 

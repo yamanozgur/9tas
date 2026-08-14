@@ -19,7 +19,7 @@ import {
   VolumeX,
   CheckCircle2
 } from 'lucide-react';
-import { fetchAllUsersAdmin, toggleUserAdFreeStatus, UserProfile } from '../lib/firebase';
+import { fetchAllUsersAdmin, toggleUserAdFreeStatus, UserProfile, isUserCurrentlyOnline, formatLastSeen } from '../lib/firebase';
 
 interface AdminPanelModalProps {
   isOpen: boolean;
@@ -116,7 +116,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
     if (!matchesSearch) return false;
 
-    if (filterType === 'online') return u.isOnline;
+    if (filterType === 'online') return isUserCurrentlyOnline(u);
     if (filterType === 'email') return !!u.email;
     if (filterType === 'guest') return !u.email;
     if (filterType === 'adfree') return !!u.isAdFree;
@@ -124,7 +124,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   });
 
   const totalUsers = users.length;
-  const onlineCount = users.filter((u) => u.isOnline).length;
+  const onlineCount = users.filter((u) => isUserCurrentlyOnline(u)).length;
   const emailUsersCount = users.filter((u) => u.email).length;
   const guestUsersCount = users.filter((u) => !u.email).length;
   const adFreeCount = users.filter((u) => u.isAdFree).length;
@@ -349,6 +349,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       const isUserAdFree = !!u.isAdFree;
                       const isUpdatingThisUser = updatingUid === u.uid;
 
+                      const isOnline = isUserCurrentlyOnline(u);
+
                       return (
                         <tr key={u.uid} className={`transition-colors ${isUserAdFree ? 'bg-amber-50/40 hover:bg-amber-50/80' : 'hover:bg-[#FAF6F0]/60'}`}>
                           <td className="py-3 px-4 font-bold text-[#2C1810]">
@@ -367,9 +369,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                                 )}
                                 <span 
                                   className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${
-                                    u.isOnline ? 'bg-emerald-500' : 'bg-gray-300'
+                                    isOnline ? 'bg-emerald-500 shadow-sm' : 'bg-gray-300'
                                   }`} 
-                                  title={u.isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
+                                  title={isOnline ? 'Çevrimiçi' : `Son görülme: ${formatLastSeen(u.lastSeen)}`}
                                 />
                               </div>
                               <div className="flex flex-col">
@@ -387,7 +389,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                                   )}
                                 </span>
                                 <span className="text-[10px] text-[#8B5A2B]/70 font-normal">
-                                  {u.isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
+                                  {isOnline ? (
+                                    <span className="text-emerald-700 font-semibold">Çevrimiçi</span>
+                                  ) : (
+                                    <span>{formatLastSeen(u.lastSeen)}</span>
+                                  )}
                                 </span>
                               </div>
                             </div>
