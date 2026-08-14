@@ -17,9 +17,19 @@ import {
   Sparkles,
   Loader2,
   VolumeX,
-  CheckCircle2
+  CheckCircle2,
+  Trash2,
+  AlertTriangle,
+  User
 } from 'lucide-react';
-import { fetchAllUsersAdmin, toggleUserAdFreeStatus, UserProfile, isUserCurrentlyOnline, formatLastSeen } from '../lib/firebase';
+import { 
+  fetchAllUsersAdmin, 
+  toggleUserAdFreeStatus, 
+  cleanupGuestUsersAdmin,
+  UserProfile, 
+  isUserCurrentlyOnline, 
+  formatLastSeen 
+} from '../lib/firebase';
 
 interface AdminPanelModalProps {
   isOpen: boolean;
@@ -35,9 +45,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [filterType, setFilterType] = useState<'all' | 'online' | 'email' | 'guest' | 'adfree'>('all');
+  const [activeTab, setActiveTab] = useState<'registered' | 'guests'>('registered');
+  const [registeredSubFilter, setRegisteredSubFilter] = useState<'all' | 'online' | 'adfree'>('all');
   const [copiedUid, setCopiedUid] = useState<string | null>(null);
   const [updatingUid, setUpdatingUid] = useState<string | null>(null);
+  const [isCleaningGuests, setIsCleaningGuests] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
 
   const loadUsers = async () => {
@@ -105,8 +117,35 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     }
   };
 
-  // Filtered users calculation
-  const filteredUsers = users.filter((u) => {
+  const handleCleanupGuests = async () => {
+    if (!window.confirm('Veritabanında kayıtlı tüm eski misafir kullanıcıları silmek istediğinize emin misiniz? Bu işlem kayıtlı üyeleri etkilemez.')) {
+      return;
+    }
+
+    setIsCleaningGuests(true);
+    try {
+      const res = await cleanupGuestUsersAdmin();
+      setUsers((prev) => prev.filter((u) => !!u.email));
+      setToastMsg({
+        text: `🗑️ ${res.deletedCount} adet eski misafir kaydı veritabanından temizlendi.`,
+        type: 'success'
+      });
+      setTimeout(() => setToastMsg(null), 4000);
+    } catch (err) {
+      console.error(err);
+      alert('Misafir verileri temizlenirken bir sorun oluştu.');
+    } finally {
+      setIsCleaningGuests(false);
+    }
+  };
+
+  const registeredUsers = users.filter((u) => !!u.email);
+  const guestUsers = users.filter((u) => !u.email);
+
+  // Filtered list based on active tab
+  const currentTabUsers = activeTab === 'registered' ? registeredUsers : guestUsers;
+
+  const filteredUsers = currentTabUsers.filter((u) => {
     const term = searchTerm.toLowerCase().trim();
     const matchesSearch = 
       !term ||
@@ -116,19 +155,17 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
     if (!matchesSearch) return false;
 
-    if (filterType === 'online') return isUserCurrentlyOnline(u);
-    if (filterType === 'email') return !!u.email;
-    if (filterType === 'guest') return !u.email;
-    if (filterType === 'adfree') return !!u.isAdFree;
+    if (activeTab === 'registered') {
+      if (registeredSubFilter === 'online') return isUserCurrentlyOnline(u);
+      if (registeredSubFilter === 'adfree') return !!u.isAdFree;
+    }
     return true;
   });
 
   const totalUsers = users.length;
-  const onlineCount = users.filter((u) => isUserCurrentlyOnline(u)).length;
-  const emailUsersCount = users.filter((u) => u.email).length;
-  const guestUsersCount = users.filter((u) => !u.email).length;
-  const adFreeCount = users.filter((u) => u.isAdFree).length;
-  const totalGamesPlayed = users.reduce((acc, u) => {
+  const onlineRegisteredCount = registeredUsers.filter((u) => isUserCurrentlyOnline(u)).length;
+  const adFreeCount = registeredUsers.filter((u) => u.isAdFree).length;
+  const totalGamesPlayed = registeredUsers.reduce((acc, u) => {
     const dtWins = u.stats?.dokuzTasWins || 0;
     const dtLosses = u.stats?.dokuzTasLosses || 0;
     const utWins = u.stats?.ucTasWins || 0;
@@ -137,7 +174,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   }, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in select-none">
       <div className="bg-[#FFFDF9] border-2 border-[#7A4219] rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden text-[#2C1810] relative">
         
         {/* Header */}
@@ -203,10 +240,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div className="bg-[#FAF6F0] border border-[#7A4219]/20 p-3 rounded-xl shadow-sm">
               <div className="flex items-center justify-between text-[#8B5A2B] text-xs font-bold mb-1">
-                <span>Toplam Kullanıcı</span>
-                <Users className="w-4 h-4 text-[#7A4219]" />
+                <span>Kayıtlı Üyeler</span>
+                <UserCheck className="w-4 h-4 text-[#7A4219]" />
               </div>
-              <div className="text-2xl font-black text-[#2C1810] font-serif">{totalUsers}</div>
+              <div className="text-2xl font-black text-[#2C1810] font-serif">{registeredUsers.length}</div>
             </div>
 
             <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl shadow-sm">
@@ -214,17 +251,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 <span>Aktif Çevrimiçi</span>
                 <Activity className="w-4 h-4 text-emerald-600 animate-pulse" />
               </div>
-              <div className="text-2xl font-black text-emerald-900 font-serif">{onlineCount}</div>
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl shadow-sm">
-              <div className="flex items-center justify-between text-amber-800 text-xs font-bold mb-1">
-                <span>E-posta / Misafir</span>
-                <UserCheck className="w-4 h-4 text-amber-700" />
-              </div>
-              <div className="text-lg font-black text-amber-900 font-serif">
-                {emailUsersCount} <span className="text-xs font-normal text-amber-700">/ {guestUsersCount}</span>
-              </div>
+              <div className="text-2xl font-black text-emerald-900 font-serif">{onlineRegisteredCount}</div>
             </div>
 
             <div className="bg-amber-100/60 border border-amber-300 p-3 rounded-xl shadow-sm">
@@ -235,14 +262,81 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               <div className="text-2xl font-black text-amber-900 font-serif">{adFreeCount}</div>
             </div>
 
-            <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl shadow-sm col-span-2 sm:col-span-1">
+            <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl shadow-sm">
               <div className="flex items-center justify-between text-purple-800 text-xs font-bold mb-1">
                 <span>Oynanan Maçlar</span>
                 <Trophy className="w-4 h-4 text-purple-700" />
               </div>
               <div className="text-2xl font-black text-purple-900 font-serif">{totalGamesPlayed}</div>
             </div>
+
+            <div className="bg-stone-100 border border-stone-300 p-3 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between text-stone-700 text-xs font-bold mb-1">
+                <span>Eski Misafir Kayıtları</span>
+                <User className="w-4 h-4 text-stone-600" />
+              </div>
+              <div className="text-2xl font-black text-stone-800 font-serif">{guestUsers.length}</div>
+            </div>
           </div>
+
+          {/* Primary View Toggle: Kayıtlı Üyeler vs Misafirler */}
+          <div className="flex items-center gap-2 border-b border-[#7A4219]/20 pb-2">
+            <button
+              onClick={() => {
+                setActiveTab('registered');
+                setSearchTerm('');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'registered'
+                  ? 'bg-[#7A4219] text-[#FFF8E7] shadow-md'
+                  : 'bg-[#FAF6F0] text-[#6E4223] hover:bg-[#7A4219]/10'
+              }`}
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Kayıtlı Oyuncular ({registeredUsers.length})</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('guests');
+                setSearchTerm('');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'guests'
+                  ? 'bg-stone-800 text-white shadow-md'
+                  : 'bg-[#FAF6F0] text-[#6E4223] hover:bg-stone-200'
+              }`}
+            >
+              <User className="w-4 h-4" />
+              <span>Eski Misafir Kayıtları ({guestUsers.length})</span>
+            </button>
+          </div>
+
+          {/* Tab 2 Special Banner: Guest DB Cleanup info */}
+          {activeTab === 'guests' && (
+            <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-900 leading-relaxed">
+                  <span className="font-bold block text-amber-950">Misafir Oyuncu Politikası</span>
+                  Misafir kullanıcılar artık sadece çevrimdışı oynar ve veritabanına yazılmaz. Aşağıdaki butona basarak veritabanında yer kaplayan eski misafir verilerini güvenle silebilirsiniz.
+                </div>
+              </div>
+
+              <button
+                onClick={handleCleanupGuests}
+                disabled={isCleaningGuests || guestUsers.length === 0}
+                className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-sm flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50 shrink-0 active:scale-95"
+              >
+                {isCleaningGuests ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                <span>Eski Misafirleri Temizle ({guestUsers.length})</span>
+              </button>
+            </div>
+          )}
 
           {/* Search & Filter Bar */}
           <div className="flex flex-col sm:flex-row items-center gap-3 justify-between bg-[#FAF6F0] p-3 rounded-xl border border-[#7A4219]/15">
@@ -253,65 +347,47 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="İsim, E-posta veya UID ile ara..."
+                placeholder={activeTab === 'registered' ? "İsim, E-posta veya UID ile ara..." : "Misafir adı veya UID ile ara..."}
                 className="w-full pl-9 pr-3 py-2 bg-[#FFFDF9] border border-[#7A4219]/25 rounded-lg text-xs text-[#2C1810] focus:outline-none focus:ring-2 focus:ring-[#7A4219]/50"
               />
             </div>
 
-            {/* Segmented Filter Buttons */}
-            <div className="flex items-center gap-1 w-full sm:w-auto overflow-x-auto text-xs font-bold">
-              <button
-                onClick={() => setFilterType('all')}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
-                  filterType === 'all'
-                    ? 'bg-[#7A4219] text-[#FFF8E7]'
-                    : 'bg-[#FFFDF9] text-[#6E4223] hover:bg-[#7A4219]/10 border border-[#7A4219]/20'
-                }`}
-              >
-                Tümü ({totalUsers})
-              </button>
-              <button
-                onClick={() => setFilterType('adfree')}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  filterType === 'adfree'
-                    ? 'bg-amber-600 text-white'
-                    : 'bg-[#FFFDF9] text-amber-800 hover:bg-amber-50 border border-amber-300'
-                }`}
-              >
-                <Sparkles className="w-3 h-3 fill-amber-300" />
-                <span>Reklamsız ({adFreeCount})</span>
-              </button>
-              <button
-                onClick={() => setFilterType('online')}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
-                  filterType === 'online'
-                    ? 'bg-emerald-700 text-white'
-                    : 'bg-[#FFFDF9] text-[#6E4223] hover:bg-emerald-50 border border-[#7A4219]/20'
-                }`}
-              >
-                Çevrimiçi ({onlineCount})
-              </button>
-              <button
-                onClick={() => setFilterType('email')}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
-                  filterType === 'email'
-                    ? 'bg-amber-800 text-white'
-                    : 'bg-[#FFFDF9] text-[#6E4223] hover:bg-amber-50 border border-[#7A4219]/20'
-                }`}
-              >
-                Üyeler ({emailUsersCount})
-              </button>
-              <button
-                onClick={() => setFilterType('guest')}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
-                  filterType === 'guest'
-                    ? 'bg-stone-700 text-white'
-                    : 'bg-[#FFFDF9] text-[#6E4223] hover:bg-stone-100 border border-[#7A4219]/20'
-                }`}
-              >
-                Misafirler ({guestUsersCount})
-              </button>
-            </div>
+            {/* Sub-filters for Registered tab */}
+            {activeTab === 'registered' && (
+              <div className="flex items-center gap-1 w-full sm:w-auto overflow-x-auto text-xs font-bold">
+                <button
+                  onClick={() => setRegisteredSubFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                    registeredSubFilter === 'all'
+                      ? 'bg-[#7A4219] text-[#FFF8E7]'
+                      : 'bg-[#FFFDF9] text-[#6E4223] hover:bg-[#7A4219]/10 border border-[#7A4219]/20'
+                  }`}
+                >
+                  Tümü ({registeredUsers.length})
+                </button>
+                <button
+                  onClick={() => setRegisteredSubFilter('adfree')}
+                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+                    registeredSubFilter === 'adfree'
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-[#FFFDF9] text-amber-800 hover:bg-amber-50 border border-amber-300'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3 fill-amber-300" />
+                  <span>Reklamsız ({adFreeCount})</span>
+                </button>
+                <button
+                  onClick={() => setRegisteredSubFilter('online')}
+                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                    registeredSubFilter === 'online'
+                      ? 'bg-emerald-700 text-white'
+                      : 'bg-[#FFFDF9] text-[#6E4223] hover:bg-emerald-50 border border-[#7A4219]/20'
+                  }`}
+                >
+                  Çevrimiçi ({onlineRegisteredCount})
+                </button>
+              </div>
+            )}
           </div>
 
           {/* User List Table */}
@@ -348,7 +424,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       const isAdmin = u.email === 'yamanozgur@gmail.com';
                       const isUserAdFree = !!u.isAdFree;
                       const isUpdatingThisUser = updatingUid === u.uid;
-
                       const isOnline = isUserCurrentlyOnline(u);
 
                       return (
@@ -489,7 +564,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
         {/* Footer */}
         <div className="p-3 sm:p-4 bg-[#FAF6F0] border-t border-[#7A4219]/15 flex items-center justify-between text-xs text-[#8B5A2B]">
-          <span>Görüntülenen: {filteredUsers.length} / {totalUsers} Kullanıcı ({adFreeCount} Reklamsız Üye)</span>
+          <span>Görüntülenen: {filteredUsers.length} Kullanıcı</span>
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl bg-[#7A4219] text-[#FFF8E7] font-bold hover:bg-[#8B5A2B] transition-colors cursor-pointer shadow-sm"
@@ -502,3 +577,4 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     </div>
   );
 };
+

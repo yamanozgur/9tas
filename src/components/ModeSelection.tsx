@@ -33,6 +33,8 @@ interface ModeSelectionProps {
   onCreateOnlineRoom: () => void;
   onJoinOnlineRoom: (code: string) => void;
   onQuickMatch: () => void;
+  onChallengeUser?: (targetUser: UserProfile, gameType: 'dokuz-tas' | 'uc-tas') => void;
+  onRequireAuth?: () => void;
   onOpenRules: () => void;
   onOpenLeaderboard: () => void;
   onLogout?: () => void;
@@ -47,6 +49,8 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
   onCreateOnlineRoom,
   onJoinOnlineRoom,
   onQuickMatch,
+  onChallengeUser,
+  onRequireAuth,
   onOpenRules,
   onOpenLeaderboard,
   onLogout,
@@ -67,6 +71,17 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [hasSearched, setHasSearched] = useState<boolean>(false);
+
+  const isGuest = !currentUser?.email;
+
+  const handleProtectedAction = (action: () => void) => {
+    if (isGuest) {
+      if (onRequireAuth) onRequireAuth();
+      return;
+    }
+    action();
+  };
+
 
   const handleSearchUsers = async (query: string) => {
     if (!query.trim()) {
@@ -369,6 +384,33 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col gap-4"
           >
+            {/* Guest Restricted Warning Banner */}
+            {isGuest && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-[#7A4219]/10 to-amber-500/10 border border-[#7A4219]/30 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-3 text-left">
+                  <div className="w-10 h-10 rounded-xl bg-[#7A4219] text-[#FFF8E7] flex items-center justify-center shrink-0 shadow-xs">
+                    <ShieldCheck className="w-6 h-6 text-[#D4AF37]" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-xs text-[#2C1810] block">
+                      Çevrimiçi Modlar Kayıtlı Üyelere Özeldir
+                    </span>
+                    <span className="text-[11px] text-[#6E4223] font-medium block">
+                      Hızlı eşleşme, canlı meydan okuma ve skor tablosu için lütfen giriş yapın.
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => onRequireAuth && onRequireAuth()}
+                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-[#7A4219] hover:bg-[#8B5A2B] text-[#FFF8E7] font-black text-xs shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>Giriş Yap / Üye Ol</span>
+                </button>
+              </div>
+            )}
+
             {/* Quick Matchmaking */}
             <div className="bg-[#FFFDF9] border border-[#D4C3B3] rounded-2xl p-4 flex flex-col gap-3 shadow-md">
               <div className="flex items-center gap-2">
@@ -379,7 +421,7 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
                 Şu an çevrimiçi olan rastgele bir rakiple anında Dokuz Taş maçı yapın.
               </p>
               <button
-                onClick={onQuickMatch}
+                onClick={() => handleProtectedAction(onQuickMatch)}
                 className="w-full py-3 rounded-xl bg-[#7A4219] hover:bg-[#8B5A2B] text-[#FFF8E7] font-extrabold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
               >
                 <span>Eşleşme Ara</span>
@@ -387,14 +429,41 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
               </button>
             </div>
 
+            {/* Özel Oda Kur / Katıl */}
+            <div className="bg-[#FFFDF9] border border-[#D4C3B3] rounded-2xl p-4 flex flex-col gap-3 shadow-md">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-[#7A4219]" />
+                <span className="font-extrabold text-sm text-[#2C1810]">Özel Oda İle Oyna</span>
+              </div>
+              <p className="text-xs text-[#6E4223]">
+                Arkadaşınızla oynamak için bir oda kurun veya arkadaşınızın oda kodunu girin.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleProtectedAction(onCreateOnlineRoom)}
+                  className="py-2.5 px-3 rounded-xl bg-[#FAF6F0] hover:bg-[#7A4219]/10 border border-[#7A4219]/30 text-[#7A4219] font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Oda Oluştur</span>
+                </button>
+                <button
+                  onClick={() => handleProtectedAction(() => setShowJoinModal(true))}
+                  className="py-2.5 px-3 rounded-xl bg-[#FAF6F0] hover:bg-[#7A4219]/10 border border-[#7A4219]/30 text-[#7A4219] font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Koda Katıl</span>
+                </button>
+              </div>
+            </div>
+
             {/* Rakip Ara (Kullanıcı Adı veya E-posta) */}
             <div className="bg-[#FFFDF9] border border-[#D4C3B3] rounded-2xl p-4 flex flex-col gap-3 shadow-md">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Search className="w-5 h-5 text-[#7A4219]" />
-                  <span className="font-extrabold text-sm text-[#2C1810]">Rakip Ara</span>
+                  <span className="font-extrabold text-sm text-[#2C1810]">Rakip Ara & Meydan Oku</span>
                 </div>
-                <span className="text-[11px] text-[#6E4223] font-medium">Kullanıcı adı veya e-posta ile</span>
+                <span className="text-[11px] text-[#6E4223] font-medium">Kullanıcı adı / e-posta</span>
               </div>
 
               <div className="flex items-center gap-2">
@@ -409,7 +478,7 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleSearchUsers(searchQuery);
                     }}
-                    placeholder="Kullanıcı adı veya e-posta girin..."
+                    placeholder="Kayıtlı oyuncu adı veya e-posta girin..."
                     className="w-full bg-[#FAF6F0] border border-[#D4C3B3] rounded-xl py-2.5 pl-3 pr-8 text-xs font-bold text-[#2C1810] focus:outline-none focus:border-[#7A4219]"
                   />
                   {isSearching && (
@@ -462,7 +531,15 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
 
                       <button
                         type="button"
-                        onClick={onCreateOnlineRoom}
+                        onClick={() =>
+                          handleProtectedAction(() => {
+                            if (onChallengeUser) {
+                              onChallengeUser(user, 'dokuz-tas');
+                            } else {
+                              onCreateOnlineRoom();
+                            }
+                          })
+                        }
                         className="px-3 py-1.5 bg-[#7A4219] hover:bg-[#8B5A2B] text-[#FFF8E7] font-extrabold text-xs rounded-lg shadow-xs flex items-center gap-1 transition-all cursor-pointer shrink-0"
                       >
                         <Swords className="w-3.5 h-3.5 text-[#D4AF37]" />
@@ -475,12 +552,13 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
 
               {hasSearched && searchResults.length === 0 && !isSearching && (
                 <p className="text-xs text-center text-[#6E4223] italic py-2">
-                  "{searchQuery}" aramasına uygun oyuncu bulunamadı.
+                  "{searchQuery}" aramasına uygun kayıtlı oyuncu bulunamadı.
                 </p>
               )}
             </div>
           </motion.div>
         )}
+
 
         {/* Footer Links (Leaderboard, Rules & Admin) */}
         <div className="flex items-center justify-center gap-3 pt-2 flex-wrap">

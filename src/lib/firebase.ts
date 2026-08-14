@@ -153,7 +153,7 @@ export function formatLastSeen(lastSeen?: string | number): string {
  * Periodically called from active clients to signal presence in Firestore
  */
 export async function updateUserPresenceHeartbeat(uid: string, isOnline: boolean = true) {
-  if (!uid || uid === 'guest_user') return;
+  if (!uid || uid === 'guest_user' || uid.startsWith('guest_')) return;
   try {
     const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, {
@@ -169,7 +169,7 @@ export async function updateUserPresenceHeartbeat(uid: string, isOnline: boolean
  * Marks user offline when tab/browser is closed or user logs out
  */
 export async function setUserOffline(uid: string) {
-  if (!uid || uid === 'guest_user') return;
+  if (!uid || uid === 'guest_user' || uid.startsWith('guest_')) return;
   try {
     const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, {
@@ -367,29 +367,27 @@ export async function resetPasswordEmail(email: string): Promise<void> {
 }
 
 export async function loginAsGuest(guestName: string): Promise<UserProfile> {
-  try {
-    const cred = await signInAnonymously(auth);
-    if (cred.user) {
-      await updateProfile(cred.user, { displayName: guestName });
-      return await syncUserProfile(cred.user, guestName);
-    }
-  } catch (err: any) {
-    console.warn('Firebase Anonymous sign-in unavailable or restricted, falling back to local guest profile:', err?.code || err);
+  // If previously logged in to Firebase Auth, sign out
+  if (auth.currentUser) {
+    await signOut(auth).catch(() => {});
   }
+  localStorage.removeItem('local_email_user');
 
-  // Fallback local guest user profile
+  // Local guest user profile stored in localStorage (0 Firestore writes)
   let localGuestUid = localStorage.getItem('local_guest_uid');
   if (!localGuestUid) {
     localGuestUid = 'guest_' + Math.random().toString(36).substring(2, 11);
     localStorage.setItem('local_guest_uid', localGuestUid);
   }
 
+  const guestAdFree = localStorage.getItem('guest_is_ad_free') === 'true';
   const nowIso = new Date().toISOString();
   const localProfile: UserProfile = {
     uid: localGuestUid,
     displayName: guestName,
     isOnline: true,
     lastSeen: nowIso,
+    isAdFree: guestAdFree,
     friendIds: [],
     friendRequestsSent: [],
     friendRequestsReceived: [],
@@ -401,19 +399,12 @@ export async function loginAsGuest(guestName: string): Promise<UserProfile> {
     }
   };
 
-  try {
-    // Try syncing to firestore if database permits
-    const userRef = doc(db, 'users', localGuestUid);
-    await setDoc(userRef, localProfile, { merge: true }).catch(() => {});
-  } catch (e) {
-    // Ignore firestore write error if unauthenticated
-  }
-
   return localProfile;
 }
 
 export async function logoutUser() {
   localStorage.removeItem('local_email_user');
+  localStorage.removeItem('local_guest_uid');
   if (auth.currentUser) {
     const userRef = doc(db, 'users', auth.currentUser.uid);
     await updateDoc(userRef, { isOnline: false, lastSeen: new Date().toISOString() }).catch(() => {});
@@ -483,7 +474,10 @@ export async function searchUsersByName(searchQuery: string, currentUid?: string
 
     snap.forEach((docSnap) => {
       const data = docSnap.data() as UserProfile;
+      // Only include registered users who have an email address
+      if (!data.email) return;
       if (currentUid && data.uid === currentUid) return;
+
       const nameMatch = data.displayName && data.displayName.toLowerCase().includes(qLower);
       const emailMatch = data.email && data.email.toLowerCase().includes(qLower);
       if (nameMatch || emailMatch) {
@@ -498,6 +492,33 @@ export async function searchUsersByName(searchQuery: string, currentUid?: string
   } catch (err) {
     console.warn("Error searching users in Firestore:", err);
     return [];
+  }
+}
+
+/**
+ * Admin utility: Permanently deletes all legacy guest users from Firestore users collection
+ */
+export async function cleanupGuestUsersAdmin(): Promise<{ deletedCount: number }> {
+  try {
+    const usersRef = collection(db, 'users');
+    const snap = await getDocs(usersRef);
+    let deletedCount = 0;
+    const deletePromises: Promise<void>[] = [];
+
+    snap.forEach((docSnap) => {
+      const data = docSnap.data() as UserProfile;
+      const isGuest = !data.email || data.uid.startsWith('guest_') || data.uid === 'guest_user';
+      if (isGuest) {
+        deletedCount++;
+        deletePromises.push(deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {}));
+      }
+    });
+
+    await Promise.all(deletePromises);
+    return { deletedCount };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, 'users');
+    return { deletedCount: 0 };
   }
 }
 

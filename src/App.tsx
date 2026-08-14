@@ -13,6 +13,9 @@ import { AdminPanelModal } from './components/AdminPanelModal';
 import { BannerAd } from './components/BannerAd';
 import { VideoAdModal } from './components/VideoAdModal';
 import { AdFreeModal } from './components/AdFreeModal';
+import { IncomingInviteModal } from './components/IncomingInviteModal';
+import { OutgoingInviteModal } from './components/OutgoingInviteModal';
+import { AuthRequiredModal } from './components/AuthRequiredModal';
 import { 
   auth, 
   syncUserProfile, 
@@ -26,11 +29,15 @@ import {
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   GameSession,
+  GameInvitation,
   createMultiplayerRoom,
   joinMultiplayerRoom,
   joinMatchmaking,
   listenToGame,
   updateGameState,
+  sendGameInvite,
+  listenToIncomingInvites,
+  respondToInvite,
 } from './lib/multiplayer';
 import { AIDifficulty, BoardState, GameMode, Player } from './types';
 import {
@@ -67,6 +74,16 @@ export default function App() {
   const [myOnlinePlayer, setMyOnlinePlayer] = useState<Player | null>(null);
   const [onlineSession, setOnlineSession] = useState<GameSession | null>(null);
   const [isWaitingOnlinePlayer, setIsWaitingOnlinePlayer] = useState<boolean>(false);
+
+  // Instant Match Invitation State
+  const [incomingInvite, setIncomingInvite] = useState<GameInvitation | null>(null);
+  const [outgoingInvite, setOutgoingInvite] = useState<{
+    inviteId: string;
+    gameId: string;
+    targetName: string;
+    gameType: 'dokuz-tas' | 'uc-tas';
+  } | null>(null);
+  const [isAuthRequiredModalOpen, setIsAuthRequiredModalOpen] = useState<boolean>(false);
 
   // Dokuz Taş Board Game State (24 Nodes)
   const [board, setBoard] = useState<BoardState>(Array(24).fill(null));
@@ -238,6 +255,20 @@ export default function App() {
 
     return () => unsub();
   }, [activeOnlineGameId, currentUser]);
+
+  // 2b. Real-time Incoming Invites Subscription (For registered users only)
+  useEffect(() => {
+    if (!currentUser || !currentUser.email || currentUser.uid.startsWith('guest_') || currentUser.uid === 'guest_user') {
+      setIncomingInvite(null);
+      return;
+    }
+
+    const unsub = listenToIncomingInvites(currentUser.uid, (invitations) => {
+      setIncomingInvite(invitations.length > 0 ? invitations[0] : null);
+    });
+
+    return () => unsub();
+  }, [currentUser?.uid, currentUser?.email]);
 
   // 3. Record Game Result to Firestore Stats, Increment Game Count & Trigger 5-Game Video Ad
   useEffect(() => {
@@ -639,7 +670,10 @@ export default function App() {
 
   // Handle Online Creation
   const handleCreateOnlineRoom = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.email) {
+      setIsAuthRequiredModalOpen(true);
+      return;
+    }
     try {
       const roomId = await createMultiplayerRoom(currentUser.uid, currentUser.displayName, 'dokuz-tas');
       setActiveOnlineGameId(roomId);
@@ -652,7 +686,10 @@ export default function App() {
 
   // Handle Online Joining
   const handleJoinOnlineRoom = async (code: string) => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.email) {
+      setIsAuthRequiredModalOpen(true);
+      return;
+    }
     try {
       const success = await joinMultiplayerRoom(code, currentUser.uid, currentUser.displayName);
       if (success) {
@@ -670,7 +707,10 @@ export default function App() {
 
   // Handle Quick Match
   const handleQuickMatch = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.email) {
+      setIsAuthRequiredModalOpen(true);
+      return;
+    }
     try {
       const res = await joinMatchmaking(currentUser.uid, currentUser.displayName, 'dokuz-tas');
       setActiveOnlineGameId(res.gameId);
@@ -679,6 +719,84 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  // Send Direct Challenge to a User
+  const handleChallengeUser = async (targetUser: UserProfile, gameType: 'dokuz-tas' | 'uc-tas' = 'dokuz-tas') => {
+    if (!currentUser || !currentUser.email) {
+      setIsAuthRequiredModalOpen(true);
+      return;
+    }
+    try {
+      const res = await sendGameInvite(
+        currentUser.uid,
+        currentUser.displayName || 'Oyuncu',
+        targetUser.uid,
+        targetUser.displayName || 'Rakip',
+        gameType
+      );
+      setOutgoingInvite({
+        inviteId: res.inviteId,
+        gameId: res.gameId,
+        targetName: targetUser.displayName || 'Rakip',
+        gameType: gameType,
+      });
+    } catch (err) {
+      console.error('Challenge error:', err);
+    }
+  };
+
+  // Accept Incoming Invite
+  const handleAcceptIncomingInvite = async (invitation: GameInvitation) => {
+    if (!currentUser) return;
+    try {
+      await respondToInvite(
+        invitation.id,
+        true,
+        currentUser.uid,
+        currentUser.displayName || 'Oyuncu'
+      );
+      setIncomingInvite(null);
+      if (invitation.gameId) {
+        setActiveOnlineGameId(invitation.gameId);
+        setGameMode('online-2p');
+        setScreen('game');
+      }
+    } catch (err) {
+      console.error('Accept invite error:', err);
+    }
+  };
+
+  // Decline Incoming Invite
+  const handleDeclineIncomingInvite = async (invitation: GameInvitation) => {
+    try {
+      await respondToInvite(
+        invitation.id,
+        false,
+        currentUser?.uid || '',
+        currentUser?.displayName || ''
+      );
+    } catch (err) {
+      console.error('Decline invite error:', err);
+    } finally {
+      setIncomingInvite(null);
+    }
+  };
+
+  // Outgoing Invite Callbacks
+  const handleOutgoingAccepted = (gameId: string) => {
+    setOutgoingInvite(null);
+    setActiveOnlineGameId(gameId);
+    setGameMode('online-2p');
+    setScreen('game');
+  };
+
+  const handleOutgoingDeclined = () => {
+    setOutgoingInvite(null);
+  };
+
+  const handleOutgoingCancel = () => {
+    setOutgoingInvite(null);
   };
 
   // Logout handler
@@ -767,6 +885,8 @@ export default function App() {
           onCreateOnlineRoom={handleCreateOnlineRoom}
           onJoinOnlineRoom={handleJoinOnlineRoom}
           onQuickMatch={handleQuickMatch}
+          onChallengeUser={handleChallengeUser}
+          onRequireAuth={() => setIsAuthRequiredModalOpen(true)}
           onOpenRules={() => setIsRulesOpen(true)}
           onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
           onLogout={handleLogout}
@@ -923,6 +1043,39 @@ export default function App() {
         onAdFreeActivated={handleAdFreeActivated}
       />
 
+      {/* Incoming Instant Match Invitation Modal */}
+      <IncomingInviteModal
+        invitation={incomingInvite}
+        onAccept={handleAcceptIncomingInvite}
+        onDecline={handleDeclineIncomingInvite}
+      />
+
+      {/* Outgoing Instant Match Invitation Modal */}
+      <OutgoingInviteModal
+        inviteId={outgoingInvite?.inviteId || null}
+        gameId={outgoingInvite?.gameId || null}
+        targetName={outgoingInvite?.targetName || 'Rakip'}
+        gameType={outgoingInvite?.gameType || 'dokuz-tas'}
+        onAccepted={handleOutgoingAccepted}
+        onDeclined={handleOutgoingDeclined}
+        onCancel={handleOutgoingCancel}
+      />
+
+      {/* Auth Required Modal for Guests attempting Online Actions */}
+      <AuthRequiredModal
+        isOpen={isAuthRequiredModalOpen}
+        onClose={() => setIsAuthRequiredModalOpen(false)}
+        onGoToAuthScreen={() => {
+          setIsAuthRequiredModalOpen(false);
+          setScreen('splash');
+        }}
+        onSuccessLogin={(profile) => {
+          setCurrentUser(profile);
+          setIsAuthRequiredModalOpen(false);
+        }}
+      />
+
     </div>
   );
 }
+

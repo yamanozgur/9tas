@@ -202,12 +202,12 @@ export async function sendGameInvite(
   receiverUid: string, 
   receiverName: string, 
   gameType: GameType
-): Promise<string> {
+): Promise<{ gameId: string; inviteId: string }> {
   // First create a waiting room
   const gameId = await createMultiplayerRoom(senderUid, senderName, gameType);
 
   const invitesRef = collection(db, 'invitations');
-  await addDoc(invitesRef, {
+  const newInviteDoc = await addDoc(invitesRef, {
     senderUid,
     senderName,
     receiverUid,
@@ -218,7 +218,38 @@ export async function sendGameInvite(
     createdAt: Date.now()
   });
 
-  return gameId;
+  return { gameId, inviteId: newInviteDoc.id };
+}
+
+// Cancel Game Invitation (by sender)
+export async function cancelGameInvite(inviteId: string) {
+  try {
+    const inviteRef = doc(db, 'invitations', inviteId);
+    await updateDoc(inviteRef, { status: 'declined' });
+  } catch (err) {
+    console.warn('Error cancelling invite:', err);
+  }
+}
+
+// Listen to an outgoing invite (by sender)
+export function listenToOutgoingInvite(
+  inviteId: string,
+  callback: (invite: GameInvitation | null) => void
+): Unsubscribe {
+  const inviteRef = doc(db, 'invitations', inviteId);
+  return onSnapshot(
+    inviteRef,
+    (snap) => {
+      if (snap.exists()) {
+        callback({ id: snap.id, ...snap.data() } as GameInvitation);
+      } else {
+        callback(null);
+      }
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.GET, `invitations/${inviteId}`);
+    }
+  );
 }
 
 // Listen to incoming game invitations
@@ -226,6 +257,9 @@ export function listenToIncomingInvites(
   userUid: string, 
   callback: (invites: GameInvitation[]) => void
 ): Unsubscribe {
+  if (!userUid || userUid.startsWith('guest_') || userUid === 'guest_user') {
+    return () => {};
+  }
   const invitesRef = collection(db, 'invitations');
   const q = query(
     invitesRef, 
@@ -237,8 +271,13 @@ export function listenToIncomingInvites(
     q, 
     (snap) => {
       const invites: GameInvitation[] = [];
+      const now = Date.now();
       snap.forEach((docSnap) => {
-        invites.push({ id: docSnap.id, ...docSnap.data() } as GameInvitation);
+        const data = docSnap.data() as GameInvitation;
+        // Ignore invites older than 60 seconds
+        if (!data.createdAt || now - data.createdAt <= 60000) {
+          invites.push({ id: docSnap.id, ...data });
+        }
       });
       callback(invites);
     },
