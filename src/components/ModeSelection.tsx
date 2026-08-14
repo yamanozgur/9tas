@@ -22,9 +22,10 @@ import {
   Crown,
   Sparkles
 } from 'lucide-react';
-import { UserProfile, loginWithGoogle, searchUsersByName, formatLastSeen } from '../lib/firebase';
+import { UserProfile, loginWithGoogle, searchUsersByName, formatLastSeen, isUserAdmin } from '../lib/firebase';
 import { GameMode, AIDifficulty } from '../types';
 import { BannerAd } from './BannerAd';
+import { ADMOB_CONFIG, isAdFreeLocally } from '../lib/admob';
 
 interface ModeSelectionProps {
   currentUser: UserProfile | null;
@@ -101,7 +102,7 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
     }
   };
 
-  const isAdmin = currentUser?.email?.toLowerCase() === 'yamanozgur@gmail.com';
+  const isAdmin = isUserAdmin(currentUser);
 
   const handleSaveName = async () => {
     if (!guestNameInput.trim()) return;
@@ -219,7 +220,7 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
           </div>
 
           {/* Ad-Free Upgrade Banner (If not ad-free) */}
-          {!currentUser?.isAdFree && onOpenAdFreeModal && (
+          {!currentUser?.isAdFree && !isAdFreeLocally() && onOpenAdFreeModal && (
             <div className="pt-2 border-t border-[#E8DFD5]">
               <button
                 type="button"
@@ -240,7 +241,7 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
                   </div>
                 </div>
                 <div className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-black text-xs shadow-xs border border-yellow-200/40 shrink-0 group-hover:scale-105 transition-transform">
-                  29.90 ₺
+                  {ADMOB_CONFIG.adFreePriceText}
                 </div>
               </button>
             </div>
@@ -590,7 +591,12 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
         </div>
 
         {/* Dashboard Banner Ad Slot */}
-        <BannerAd placement="dashboard" className="mt-3" isAdFree={currentUser?.isAdFree} />
+        <BannerAd 
+          placement="dashboard" 
+          className="mt-3" 
+          isAdFree={Boolean(currentUser?.isAdFree || isAdFreeLocally())} 
+          onOpenAdFreeModal={onOpenAdFreeModal}
+        />
 
       </div>
 

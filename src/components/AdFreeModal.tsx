@@ -9,9 +9,11 @@ import {
   VolumeX, 
   Crown, 
   Lock,
-  Loader2
+  Loader2,
+  Scale
 } from 'lucide-react';
 import { toggleUserAdFreeStatus, UserProfile } from '../lib/firebase';
+import { ADMOB_CONFIG, saveAdFreeLocally } from '../lib/admob';
 
 interface AdFreeModalProps {
   isOpen: boolean;
@@ -76,25 +78,18 @@ export const AdFreeModal: React.FC<AdFreeModalProps> = ({
     setIsProcessing(true);
 
     try {
-      // Simulate payment processing delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Simulate secure payment gateway transaction
+      await new Promise((resolve) => setTimeout(resolve, 1400));
 
-      const uid = currentUser?.uid || 'guest_user';
-      if (currentUser?.uid) {
-        await toggleUserAdFreeStatus(currentUser.uid, true);
+      // 1. Save to Firestore if registered user
+      if (currentUser?.uid && !currentUser.uid.startsWith('guest_') && currentUser.uid !== 'guest_user') {
+        await toggleUserAdFreeStatus(currentUser.uid, true).catch((err) => {
+          console.warn('Could not sync ad-free to Firestore immediately:', err);
+        });
       }
 
-      // Update local storage for guest or local user persistence
-      const storedLocalUser = localStorage.getItem('local_email_user');
-      if (storedLocalUser) {
-        try {
-          const parsed = JSON.parse(storedLocalUser);
-          parsed.isAdFree = true;
-          localStorage.setItem('local_email_user', JSON.stringify(parsed));
-        } catch (err) {}
-      } else {
-        localStorage.setItem('guest_is_ad_free', 'true');
-      }
+      // 2. Save to localStorage permanently
+      saveAdFreeLocally();
 
       setIsSuccess(true);
       onAdFreeActivated();
@@ -124,15 +119,15 @@ export const AdFreeModal: React.FC<AdFreeModalProps> = ({
           </div>
 
           <h3 className="text-xl font-black font-serif tracking-wide text-[#FFF8E7]">
-            REKLAMSIZ ÜYELİK
+            REKLAMLARI KALDIR
           </h3>
           <p className="text-xs text-[#D4AF37] font-semibold mt-0.5">
-            Ömür Boyu Tek Seferlik Ödeme
+            Ömür Boyu Kalıcı & Kesintisiz Oyun
           </p>
 
           <div className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-yellow-200 font-extrabold text-lg shadow-inner">
-            <span className="text-2xl font-black text-amber-300">29.90 ₺</span>
-            <span className="text-[10px] uppercase font-bold text-yellow-100/80 tracking-wider">/ Tek Sefer</span>
+            <span className="text-2xl font-black text-amber-300">{ADMOB_CONFIG.adFreePriceText}</span>
+            <span className="text-[10px] uppercase font-bold text-yellow-100/80 tracking-wider">/ Tek Seferlik</span>
           </div>
         </div>
 
@@ -144,9 +139,9 @@ export const AdFreeModal: React.FC<AdFreeModalProps> = ({
                 <CheckCircle2 className="w-10 h-10" />
               </div>
               <div className="space-y-1">
-                <h4 className="text-xl font-black text-[#2C1810]">Ödeme Başarılı!</h4>
+                <h4 className="text-xl font-black text-[#2C1810]">Satın Alma Başarılı!</h4>
                 <p className="text-xs text-[#7A4219] font-medium max-w-xs mx-auto">
-                  Tebrikler! Reklamsız üyeliğiniz hesabınıza tanımlandı. Artık hiçbir reklam görmeden kesintisiz oynayabilirsiniz.
+                  Tebrikler! Reklamsız paket hesabınıza tanımlandı. Banner ve geçiş reklamları tamamen kaldırılmıştır.
                 </p>
               </div>
 
@@ -165,31 +160,31 @@ export const AdFreeModal: React.FC<AdFreeModalProps> = ({
                   <VolumeX className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                   <div>
                     <h5 className="text-xs font-black text-[#2C1810]">Sıfır Reklam</h5>
-                    <p className="text-[10px] text-[#7A4219]">Banner ve video reklamlar engellenir.</p>
+                    <p className="text-[10px] text-[#7A4219]">Banner ve video geçiş reklamları hiç gösterilmez.</p>
                   </div>
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-[#FAF6F0] border border-[#7A4219]/15 flex items-start gap-2">
                   <Zap className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                   <div>
-                    <h5 className="text-xs font-black text-[#2C1810]">Kesintisiz Akış</h5>
-                    <p className="text-[10px] text-[#7A4219]">Maç aralarında takılmadan devam edin.</p>
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-[#FAF6F0] border border-[#7A4219]/15 flex items-start gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                  <div>
-                    <h5 className="text-xs font-black text-[#2C1810]">VIP Rozet</h5>
-                    <p className="text-[10px] text-[#7A4219]">Profilinizde ayrıcalıklı rozet görünür.</p>
+                    <h5 className="text-xs font-black text-[#2C1810]">Hızlı & Akıcı</h5>
+                    <p className="text-[10px] text-[#7A4219]">Maç aralarında bekleme yapmadan oyuna devam edin.</p>
                   </div>
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-[#FAF6F0] border border-[#7A4219]/15 flex items-start gap-2">
                   <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                   <div>
-                    <h5 className="text-xs font-black text-[#2C1810]">Süresiz Erişim</h5>
-                    <p className="text-[10px] text-[#7A4219]">Aylık abonelik yok, tek seferlik ödeme.</p>
+                    <h5 className="text-xs font-black text-[#2C1810]">Kalıcı Erişim</h5>
+                    <p className="text-[10px] text-[#7A4219]">Abonelik yok. Tek seferlik ödemeyle tüm cihazlarda geçerli.</p>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-[#FAF6F0] border border-[#7A4219]/15 flex items-start gap-2">
+                  <Scale className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <h5 className="text-xs font-black text-[#2C1810]">Eşit & Adil Oyun</h5>
+                    <p className="text-[10px] text-[#7A4219]">Oyun mekaniğinde kimseye haksız avantaj sağlamaz.</p>
                   </div>
                 </div>
               </div>
@@ -198,7 +193,7 @@ export const AdFreeModal: React.FC<AdFreeModalProps> = ({
               <form onSubmit={handlePaymentSubmit} className="space-y-3 pt-2">
                 <div className="flex items-center justify-between text-xs font-bold text-[#7A4219] pb-1 border-b border-[#7A4219]/15">
                   <span className="flex items-center gap-1">
-                    <CreditCard className="w-3.5 h-3.5" /> Ödeme Bilgileri (29.90 ₺)
+                    <CreditCard className="w-3.5 h-3.5" /> Tek Seferlik Ödeme ({ADMOB_CONFIG.adFreePriceText})
                   </span>
                   <span className="text-[10px] text-emerald-700 font-extrabold flex items-center gap-0.5">
                     <Lock className="w-3 h-3" /> 256-Bit SSL Güvenli
@@ -285,14 +280,15 @@ export const AdFreeModal: React.FC<AdFreeModalProps> = ({
                   ) : (
                     <>
                       <Lock className="w-4 h-4 text-[#D4AF37]" />
-                      <span>29.90 ₺ Öde ve Reklamları Kaldır</span>
+                      <span>{ADMOB_CONFIG.adFreePriceText} Öde ve Reklamları Kaldır</span>
                     </>
                   )}
                 </button>
 
-                <p className="text-[10px] text-center text-[#8B5A2B] font-medium pt-1">
-                  💡 Ödeme gerçekleştikten sonra reklamsız üyelik süresiz aktif olur.
-                </p>
+                <div className="text-[10px] text-center text-[#8B5A2B] font-medium pt-1 space-y-0.5">
+                  <p>⚖️ <strong>Adalet Kuralı:</strong> Reklam kaldırma sadece bekleme ve reklamları ortadan kaldırır; oyun içi ekstra hamle, ipucu veya avantaj vermez.</p>
+                  <p>💡 Tek seferlik ödemeniz hem bu cihazda hem de hesabınızda kalıcı olarak saklanır.</p>
+                </div>
               </form>
             </>
           )}
@@ -302,3 +298,4 @@ export const AdFreeModal: React.FC<AdFreeModalProps> = ({
     </div>
   );
 };
+

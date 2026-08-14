@@ -2,7 +2,10 @@
 import { 
   db,
   handleFirestoreError,
-  OperationType
+  OperationType,
+  ADMIN_EMAIL,
+  ADMIN_NAME,
+  isUserAdmin
 } from './firebase';
 import { 
   doc, 
@@ -42,6 +45,7 @@ export interface GameSession {
   millCountP1?: number;
   millCountP2?: number;
   rematchRequestedBy?: string | null;
+  isAdminHost?: boolean;
 }
 
 export interface GameInvitation {
@@ -72,9 +76,11 @@ export function createInitialGameData(
   p1Uid: string,
   p1Name: string,
   p2Uid: string = '',
-  p2Name: string = 'Bekleniyor...'
+  p2Name: string = 'Bekleniyor...',
+  isAdminHost: boolean = false
 ): GameSession {
   const isUc = gameType === 'uc-tas';
+  const isHostAdmin = isAdminHost || p1Name.toLowerCase().trim() === ADMIN_NAME.toLowerCase();
   return {
     gameId,
     gameType,
@@ -93,6 +99,7 @@ export function createInitialGameData(
     status: p2Uid ? 'active' : 'waiting',
     lastMoveTimestamp: Date.now(),
     selectedNodeIndex: null,
+    isAdminHost: isHostAdmin,
   };
 }
 
@@ -100,11 +107,12 @@ export function createInitialGameData(
 export async function createMultiplayerRoom(
   p1Uid: string, 
   p1Name: string, 
-  gameType: GameType
+  gameType: GameType,
+  isAdminHost: boolean = false
 ): Promise<string> {
   const gamesRef = collection(db, 'games');
   const newDoc = doc(gamesRef);
-  const initialData = createInitialGameData(newDoc.id, gameType, p1Uid, p1Name);
+  const initialData = createInitialGameData(newDoc.id, gameType, p1Uid, p1Name, '', 'Bekleniyor...', isAdminHost);
   await setDoc(newDoc, initialData);
   return newDoc.id;
 }
@@ -160,13 +168,16 @@ export async function updateGameState(gameId: string, updates: Partial<GameSessi
   });
 }
 
-// Matchmaking Queue Logic
+// Matchmaking Queue Logic (Admin is exempt from random auto-matching)
 export async function joinMatchmaking(
   uid: string, 
   displayName: string, 
-  gameType: GameType
+  gameType: GameType,
+  isUserAdminFlag: boolean = false
 ): Promise<{ gameId: string; unsubscribeQueue?: Unsubscribe }> {
-  // Check if there is already an open room waiting for P2
+  const isP1Admin = isUserAdminFlag || displayName.toLowerCase().trim() === ADMIN_NAME.toLowerCase();
+
+  // Check if there is already an open room waiting for P2 (excluding admin rooms)
   const gamesRef = collection(db, 'games');
   const q = query(
     gamesRef, 
@@ -178,7 +189,12 @@ export async function joinMatchmaking(
   let availableGame: GameSession | null = null;
   snap.forEach((d) => {
     const data = d.data() as GameSession;
-    if (data.p1Uid !== uid && !data.p2Uid) {
+    const isRoomAdmin = 
+      data.isAdminHost || 
+      data.p1Name?.toLowerCase().trim() === ADMIN_NAME.toLowerCase();
+    
+    // Regular players should never be matched with Admin test rooms, and Admin won't auto-match into regular rooms
+    if (data.p1Uid !== uid && !data.p2Uid && !isRoomAdmin && !isP1Admin) {
       availableGame = data;
     }
   });
@@ -190,12 +206,12 @@ export async function joinMatchmaking(
     return { gameId: game.gameId };
   }
 
-  // Otherwise, create a new waiting room
-  const newGameId = await createMultiplayerRoom(uid, displayName, gameType);
+  // Otherwise, create a new waiting room (tagged if admin)
+  const newGameId = await createMultiplayerRoom(uid, displayName, gameType, isP1Admin);
   return { gameId: newGameId };
 }
 
-// Send Friend Game Invitation
+// Send Friend Game Invitation (Admin is exempt from challenges)
 export async function sendGameInvite(
   senderUid: string, 
   senderName: string, 
@@ -203,6 +219,11 @@ export async function sendGameInvite(
   receiverName: string, 
   gameType: GameType
 ): Promise<{ gameId: string; inviteId: string }> {
+  // Disallow challenging the Admin
+  if (receiverName.toLowerCase().trim() === ADMIN_NAME.toLowerCase()) {
+    throw new Error('Yönetici (The Boss) meydan okumalardan muaftır.');
+  }
+
   // First create a waiting room
   const gameId = await createMultiplayerRoom(senderUid, senderName, gameType);
 
@@ -252,14 +273,20 @@ export function listenToOutgoingInvite(
   );
 }
 
-// Listen to incoming game invitations
+// Listen to incoming game invitations (Admin is exempt from unsolicited invites)
 export function listenToIncomingInvites(
   userUid: string, 
-  callback: (invites: GameInvitation[]) => void
+  callback: (invites: GameInvitation[]) => void,
+  userDisplayName?: string
 ): Unsubscribe {
   if (!userUid || userUid.startsWith('guest_') || userUid === 'guest_user') {
     return () => {};
   }
+  // Exclude Admin from receiving challenge notifications
+  if (userDisplayName && userDisplayName.toLowerCase().trim() === ADMIN_NAME.toLowerCase()) {
+    return () => {};
+  }
+
   const invitesRef = collection(db, 'invitations');
   const q = query(
     invitesRef, 

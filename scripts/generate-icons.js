@@ -1,4 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+import fs from 'fs';
+import path from 'path';
+import sharp from 'sharp';
+
+// High-resolution SVG of the 9 Taş board icon from the splash/auth screen
+const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#FFFDF9" />
@@ -66,3 +71,35 @@
     <circle cx="76" cy="256" r="22" fill="#2C1810" stroke="#D4AF37" stroke-width="4" />
   </g>
 </svg>
+`;
+
+async function generate() {
+  const publicDir = path.resolve(process.cwd(), 'public');
+
+  // Save SVG
+  fs.writeFileSync(path.join(publicDir, 'icon.svg'), svgContent.trim());
+  console.log('Saved icon.svg');
+
+  // Generate PNG 512x512
+  await sharp(Buffer.from(svgContent))
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(publicDir, 'icon512.png'));
+  console.log('Generated icon512.png');
+
+  // Generate PNG 192x192
+  await sharp(Buffer.from(svgContent))
+    .resize(192, 192)
+    .png()
+    .toFile(path.join(publicDir, 'icon192.png'));
+  console.log('Generated icon192.png');
+
+  // Generate Apple Touch Icon 180x180
+  await sharp(Buffer.from(svgContent))
+    .resize(180, 180)
+    .png()
+    .toFile(path.join(publicDir, 'apple-touch-icon.png'));
+  console.log('Generated apple-touch-icon.png');
+}
+
+generate().catch(console.error);

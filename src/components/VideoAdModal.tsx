@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Volume2, VolumeX, SkipForward, Tv, CheckCircle2, Sparkles } from 'lucide-react';
+import { Play, Volume2, VolumeX, SkipForward, Tv, CheckCircle2, Sparkles, Scale } from 'lucide-react';
+import { ADMOB_CONFIG } from '../lib/admob';
 
 interface VideoAdModalProps {
   isOpen: boolean;
@@ -30,14 +31,14 @@ export const VideoAdModal: React.FC<VideoAdModalProps> = ({ isOpen, gameCount, o
       });
     }, 1000);
 
-    // Progress bar animation (10 seconds total video duration)
+    // Progress bar animation
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(progressInterval);
           return 100;
         }
-        return prev + 2;
+        return prev + 4;
       });
     }, 200);
 
@@ -50,7 +51,7 @@ export const VideoAdModal: React.FC<VideoAdModalProps> = ({ isOpen, gameCount, o
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300 select-none">
       <div className="bg-[#1E140E] border-2 border-[#7A4219] rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col relative text-[#FAF6F0]">
         
         {/* Top Header Bar */}
@@ -58,11 +59,11 @@ export const VideoAdModal: React.FC<VideoAdModalProps> = ({ isOpen, gameCount, o
           <div className="flex items-center gap-2">
             <Tv className="w-4 h-4 text-[#D4AF37]" />
             <span className="font-extrabold text-xs tracking-wide text-[#FAF6F0]">
-              SPONSORLU VİDEO REKLAM
+              GOOGLE ADMOB GEÇİŞ REKLAMI
             </span>
           </div>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#7A4219]/40 border border-[#D4AF37]/30 text-[#D4AF37]">
-            {gameCount}. Oyun Reklamı
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#7A4219]/40 border border-[#D4AF37]/30 text-[#D4AF37]" title={`Ad Unit ID: ${ADMOB_CONFIG.interstitialAdUnitId}`}>
+            5/5 Oyun Tamamlandı
           </span>
         </div>
 
@@ -84,8 +85,8 @@ export const VideoAdModal: React.FC<VideoAdModalProps> = ({ isOpen, gameCount, o
           </p>
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#2C1810]/80 rounded-full border border-[#D4AF37]/30 text-[11px] text-[#D4AF37] font-bold relative z-10">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Sponsorlu Oyun İçi Gösterim</span>
+            <Scale className="w-3.5 h-3.5" />
+            <span>Adil Oyun: Reklamlar oyun içi avantaj sağlamaz</span>
           </div>
 
           {/* Top Right Sound Toggle */}
@@ -110,10 +111,10 @@ export const VideoAdModal: React.FC<VideoAdModalProps> = ({ isOpen, gameCount, o
         <div className="bg-[#2C1810] p-4 flex items-center justify-between border-t border-[#522F18]">
           <div className="flex flex-col">
             <span className="text-[11px] text-[#D4C3B3] font-medium">
-              Her 5 oyunda bir kısa sponsor reklamı gösterilir.
+              Her 5 oyun tamamlandığında kısa bir geçiş reklamı gösterilir.
             </span>
             <span className="text-[10px] text-[#A89280]">
-              Oyun geliştirilmesini desteklediğiniz için teşekkür ederiz.
+              Oyun sunucularını ve geliştirmeyi desteklediğiniz için teşekkürler.
             </span>
           </div>
 
@@ -123,14 +124,14 @@ export const VideoAdModal: React.FC<VideoAdModalProps> = ({ isOpen, gameCount, o
               disabled
               className="px-4 py-2 bg-[#1A100B] border border-[#522F18] text-[#A89280] font-bold text-xs rounded-xl flex items-center gap-2 opacity-80 cursor-not-allowed"
             >
-              <span>{countdown}s sonra Reklamı Geç</span>
+              <span>{countdown}s sonra Geç</span>
             </button>
           ) : (
             <button
               onClick={onClose}
               className="px-5 py-2.5 bg-[#D4AF37] hover:bg-[#E6C687] text-[#2C1810] font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 animate-pulse"
             >
-              <span>Reklamı Geç</span>
+              <span>Reklamı Kapat</span>
               <SkipForward className="w-4 h-4 fill-[#2C1810]" />
             </button>
           )}
@@ -140,3 +141,4 @@ export const VideoAdModal: React.FC<VideoAdModalProps> = ({ isOpen, gameCount, o
     </div>
   );
 };
+

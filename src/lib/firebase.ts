@@ -15,9 +15,11 @@ import {
 } from 'firebase/auth';
 import { 
   getFirestore, 
+  initializeFirestore,
   doc, 
   setDoc, 
   getDoc, 
+  getDocFromServer,
   updateDoc, 
   onSnapshot,
   arrayUnion,
@@ -37,7 +39,18 @@ import firebaseConfig from '../../firebase-applet-config.json';
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
+
+// Robust Firestore Initialization with fallback and auto long-polling for sandboxed environments
+let dbInstance;
+try {
+  dbInstance = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+  }, firebaseConfig.firestoreDatabaseId || undefined);
+} catch {
+  dbInstance = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
+}
+
+export const db = dbInstance;
 export const googleProvider = new GoogleAuthProvider();
 
 export enum OperationType {
@@ -91,6 +104,19 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   } else {
     console.warn(`Firestore [${operationType}] warning at ${path}:`, errMessage);
   }
+}
+
+export const ADMIN_EMAIL = 'yamanozgur@gmail.com';
+export const ADMIN_NAME = 'The Boss';
+
+/**
+ * Checks if a given profile or email/displayName belongs to the Admin
+ */
+export function isUserAdmin(user?: { email?: string | null; displayName?: string | null } | null): boolean {
+  if (!user) return false;
+  const emailMatch = user.email ? user.email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase() : false;
+  const nameMatch = user.displayName ? user.displayName.toLowerCase().trim() === ADMIN_NAME.toLowerCase() : false;
+  return Boolean(emailMatch || nameMatch);
 }
 
 export interface UserProfile {
@@ -478,6 +504,9 @@ export async function searchUsersByName(searchQuery: string, currentUid?: string
       if (!data.email) return;
       if (currentUid && data.uid === currentUid) return;
 
+      // Exempt Admin from opponent search & challenges
+      if (isUserAdmin(data)) return;
+
       const nameMatch = data.displayName && data.displayName.toLowerCase().includes(qLower);
       const emailMatch = data.email && data.email.toLowerCase().includes(qLower);
       if (nameMatch || emailMatch) {
@@ -595,7 +624,7 @@ export async function getLeaderboard(): Promise<UserProfile[]> {
 }
 
 export async function recordGameResult(winnerUid?: string, loserUid?: string) {
-  if (winnerUid) {
+  if (winnerUid && !winnerUid.startsWith('guest_') && winnerUid !== 'guest_user') {
     try {
       const winnerRef = doc(db, 'users', winnerUid);
       const snap = await getDoc(winnerRef);
@@ -610,7 +639,7 @@ export async function recordGameResult(winnerUid?: string, loserUid?: string) {
     }
   }
 
-  if (loserUid) {
+  if (loserUid && !loserUid.startsWith('guest_') && loserUid !== 'guest_user') {
     try {
       const loserRef = doc(db, 'users', loserUid);
       const snap = await getDoc(loserRef);
@@ -623,5 +652,20 @@ export async function recordGameResult(winnerUid?: string, loserUid?: string) {
     } catch (err) {
       console.warn("Could not update loser stats:", err);
     }
+  }
+}
+
+/**
+ * Validates connection to Firestore on initial boot without unhandled errors
+ */
+export async function validateFirestoreConnection(): Promise<boolean> {
+  try {
+    await getDocFromServer(doc(db, 'users', 'connection_test'));
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.info("Firestore is currently operating in offline cache mode.");
+    }
+    return false;
   }
 }

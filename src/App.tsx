@@ -24,9 +24,17 @@ import {
   recordGameResult, 
   logoutUser,
   updateUserPresenceHeartbeat,
-  setUserOffline 
+  setUserOffline,
+  validateFirestoreConnection,
+  isUserAdmin 
 } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import {
+  incrementGameCountAndCheckAd,
+  getPlayedGamesCount,
+  isAdFreeLocally,
+  saveAdFreeLocally
+} from './lib/admob';
 import {
   GameSession,
   GameInvitation,
@@ -59,11 +67,8 @@ export default function App() {
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
   const [isAdFreeModalOpen, setIsAdFreeModalOpen] = useState<boolean>(false);
 
-  // Ads & Game Count State
-  const [gamesPlayedCount, setGamesPlayedCount] = useState<number>(() => {
-    const saved = localStorage.getItem('dokuztas_played_games_count');
-    return saved ? parseInt(saved, 10) || 0 : 0;
-  });
+  // Ads & Game Count State (Persisted in localStorage across sessions)
+  const [gamesPlayedCount, setGamesPlayedCount] = useState<number>(() => getPlayedGamesCount());
   const [isVideoAdOpen, setIsVideoAdOpen] = useState<boolean>(false);
 
   // User Profile
@@ -117,6 +122,8 @@ export default function App() {
 
   // 1. Firebase Auth Listener & Profile Sync
   useEffect(() => {
+    validateFirestoreConnection();
+
     const unsub = onAuthStateChanged(auth, async (user) => {
       try {
         if (user) {
@@ -173,7 +180,7 @@ export default function App() {
 
   // 1b. Active Presence Heartbeat & Auto Offline Cleanup
   useEffect(() => {
-    if (!currentUser || !currentUser.uid || currentUser.uid === 'guest_user') return;
+    if (!currentUser || !currentUser.uid || currentUser.uid === 'guest_user' || currentUser.uid.startsWith('guest_')) return;
 
     const uid = currentUser.uid;
 
@@ -256,19 +263,25 @@ export default function App() {
     return () => unsub();
   }, [activeOnlineGameId, currentUser]);
 
-  // 2b. Real-time Incoming Invites Subscription (For registered users only)
+  // 2b. Real-time Incoming Invites Subscription (For registered non-admin users only)
   useEffect(() => {
     if (!currentUser || !currentUser.email || currentUser.uid.startsWith('guest_') || currentUser.uid === 'guest_user') {
       setIncomingInvite(null);
       return;
     }
 
+    // Exempt Admin from receiving invitation interruptions
+    if (isUserAdmin(currentUser)) {
+      setIncomingInvite(null);
+      return;
+    }
+
     const unsub = listenToIncomingInvites(currentUser.uid, (invitations) => {
       setIncomingInvite(invitations.length > 0 ? invitations[0] : null);
-    });
+    }, currentUser.displayName);
 
     return () => unsub();
-  }, [currentUser?.uid, currentUser?.email]);
+  }, [currentUser?.uid, currentUser?.email, currentUser?.displayName]);
 
   // 3. Record Game Result to Firestore Stats, Increment Game Count & Trigger 5-Game Video Ad
   useEffect(() => {
@@ -276,14 +289,13 @@ export default function App() {
       setIsGameOverModalOpen(true);
 
       // Increment played games counter & check for 5th game video ad (skip if user has ad-free status)
-      setGamesPlayedCount((prev) => {
-        const next = prev + 1;
-        localStorage.setItem('dokuztas_played_games_count', next.toString());
-        if (next % 5 === 0 && !currentUser?.isAdFree) {
-          setIsVideoAdOpen(true);
-        }
-        return next;
-      });
+      const userHasAdFree = Boolean(currentUser?.isAdFree || isAdFreeLocally());
+      const { count, shouldShowAd } = incrementGameCountAndCheckAd();
+      setGamesPlayedCount(count);
+
+      if (shouldShowAd && !userHasAdFree) {
+        setIsVideoAdOpen(true);
+      }
 
       if (currentUser?.uid) {
         if (winner === 'P1') {
@@ -705,14 +717,15 @@ export default function App() {
     }
   };
 
-  // Handle Quick Match
+  // Handle Quick Match (Admin creates separate room and is exempt from auto matching with regular players)
   const handleQuickMatch = async () => {
     if (!currentUser || !currentUser.email) {
       setIsAuthRequiredModalOpen(true);
       return;
     }
     try {
-      const res = await joinMatchmaking(currentUser.uid, currentUser.displayName, 'dokuz-tas');
+      const isAdmin = isUserAdmin(currentUser);
+      const res = await joinMatchmaking(currentUser.uid, currentUser.displayName, 'dokuz-tas', isAdmin);
       setActiveOnlineGameId(res.gameId);
       setGameMode('online-2p');
       setScreen('game');
@@ -984,8 +997,8 @@ export default function App() {
             {/* Game Screen Banner Ad Slot */}
             <BannerAd 
               placement="game" 
-              className="mt-1 shrink-0" 
-              isAdFree={currentUser?.isAdFree} 
+              className="mt-2 shrink-0" 
+              isAdFree={Boolean(currentUser?.isAdFree || isAdFreeLocally())} 
               onOpenAdFreeModal={() => setIsAdFreeModalOpen(true)}
             />
           </main>

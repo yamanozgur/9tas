@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, Info, Volume2, VolumeX, Sparkles, ShieldAlert, Crown } from 'lucide-react';
+import { ExternalLink, Info, Crown, Tv } from 'lucide-react';
+import { ADMOB_CONFIG } from '../lib/admob';
 
 interface BannerAdProps {
   placement?: 'dashboard' | 'game';
@@ -13,7 +14,7 @@ const SAMPLE_ADS = [
     id: 1,
     title: 'Akıl & Zeka Oyunları Festivali 2026',
     desc: 'Türkiye geneli Dokuz Taş ve Mangala Turnuvası kayıtları başladı!',
-    tag: 'SPONSORLU',
+    tag: 'ADMOB REKLAM',
     buttonText: 'Hemen Katıl',
     color: 'from-[#7A4219] to-[#8B5A2B]',
     bgPattern: 'bg-[#FFFDF9]',
@@ -23,7 +24,7 @@ const SAMPLE_ADS = [
     id: 2,
     title: 'El Yapımı Ahşap Dokuz Taş Takımı',
     desc: 'Doğal ceviz ağacından özel işleme nostaljik oyun tahtaları %20 indirimde.',
-    tag: 'REKLAM',
+    tag: 'SPONSORLU',
     buttonText: 'İncele',
     color: 'from-[#6E4223] to-[#522F18]',
     bgPattern: 'bg-[#FAF6F0]',
@@ -33,7 +34,7 @@ const SAMPLE_ADS = [
     id: 3,
     title: 'Zeka & Strateji Akademi',
     desc: 'Çocuklar ve yetişkinler için online satranç ve strateji eğitimleri.',
-    tag: 'SPONSORLU',
+    tag: 'ADMOB REKLAM',
     buttonText: 'Detaylı Bilgi',
     color: 'from-[#2C1810] to-[#7A4219]',
     bgPattern: 'bg-[#FFFDF9]',
@@ -75,7 +76,7 @@ export const BannerAd: React.FC<BannerAdProps> = ({
             {currentAd.tag}
           </span>
           <span className="text-[10px] text-[#6E4223] font-medium">
-            {placement === 'dashboard' ? 'Sponsorlu Alan' : 'Oyun İçi Reklam'}
+            {placement === 'dashboard' ? 'Google AdMob Banner' : 'Oyun İçi Sabit Banner'}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -85,10 +86,10 @@ export const BannerAd: React.FC<BannerAdProps> = ({
               className="text-[10px] font-black text-amber-800 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
             >
               <Crown className="w-3 h-3 text-amber-600 fill-amber-300" />
-              <span>Reklamları Kaldır (29.90 ₺)</span>
+              <span>Reklamları Kaldır ({ADMOB_CONFIG.adFreePriceText})</span>
             </button>
           )}
-          <div className="flex items-center text-[#A89280]" title="Reklam Seçenekleri">
+          <div className="flex items-center text-[#A89280]" title={`Ad Unit ID: ${ADMOB_CONFIG.bannerAdUnitId}`}>
             <Info className="w-3 h-3 cursor-pointer hover:text-[#7A4219] transition-colors" />
           </div>
         </div>
@@ -114,7 +115,6 @@ export const BannerAd: React.FC<BannerAdProps> = ({
           href="#ad-click"
           onClick={(e) => {
             e.preventDefault();
-            alert(`"${currentAd.title}" reklam bağlantısına tıklandı.`);
           }}
           className="px-3 py-1.5 bg-[#7A4219] hover:bg-[#8B5A2B] text-[#FFF8E7] font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shrink-0 shadow-xs active:scale-95"
         >
@@ -125,3 +125,4 @@ export const BannerAd: React.FC<BannerAdProps> = ({
     </div>
   );
 };
+
