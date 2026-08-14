@@ -40,14 +40,19 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 
 export const auth = getAuth(app);
 
-// Robust Firestore Initialization with fallback and auto long-polling for sandboxed environments
+// Robust Firestore Initialization with reliable long-polling for sandboxed environments
 let dbInstance;
+const databaseId = firebaseConfig.firestoreDatabaseId || undefined;
 try {
-  dbInstance = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
-  }, firebaseConfig.firestoreDatabaseId || undefined);
+  dbInstance = initializeFirestore(
+    app, 
+    {
+      experimentalForceLongPolling: true,
+    }, 
+    databaseId
+  );
 } catch {
-  dbInstance = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
+  dbInstance = getFirestore(app, databaseId);
 }
 
 export const db = dbInstance;
@@ -660,7 +665,7 @@ export async function recordGameResult(winnerUid?: string, loserUid?: string) {
  */
 export async function validateFirestoreConnection(): Promise<boolean> {
   try {
-    await getDocFromServer(doc(db, 'users', 'connection_test'));
+    await getDoc(doc(db, 'users', 'connection_test'));
     return true;
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {

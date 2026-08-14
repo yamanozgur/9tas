@@ -856,7 +856,7 @@ export default function App() {
         : onlineSession?.p2Name || '2. Oyuncu';
     statusMessage = winner === 'draw' ? 'OYUN BİTTİ: Berabere!' : `🎉 OYUN BİTTİ: ${winnerName} Kazandı!`;
   } else if (isWaitingOnlinePlayer) {
-    statusMessage = `Rakip bekleniyor... Oda Kodu: ${activeOnlineGameId}`;
+    statusMessage = 'Çevrimiçi rakip aranıyor / bekleniyor...';
   } else if (isRemovalPhase) {
     statusMessage = 'ÜÇLÜ OLUŞTU! Rakip taş seçip çıkarın.';
   } else if (phase === 'placement') {

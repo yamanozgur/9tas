@@ -6,8 +6,7 @@ import {
   Users, 
   Globe, 
   User, 
-  PlusCircle, 
-  LogIn, 
+  LogIn,
   LogOut,
   Check, 
   ArrowRight,
@@ -31,8 +30,8 @@ interface ModeSelectionProps {
   currentUser: UserProfile | null;
   onUpdateUserName: (name: string) => Promise<void>;
   onStartOfflineGame: (mode: GameMode, difficulty?: AIDifficulty) => void;
-  onCreateOnlineRoom: () => void;
-  onJoinOnlineRoom: (code: string) => void;
+  onCreateOnlineRoom?: () => void;
+  onJoinOnlineRoom?: (code: string) => void;
   onQuickMatch: () => void;
   onChallengeUser?: (targetUser: UserProfile, gameType: 'dokuz-tas' | 'uc-tas') => void;
   onRequireAuth?: () => void;
@@ -63,8 +62,6 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
   const [offlineType, setOfflineType] = useState<'vs-ai' | 'pass-and-play'>('vs-ai');
   const [guestNameInput, setGuestNameInput] = useState<string>(currentUser?.displayName || 'Oyuncu 1');
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
-  const [roomCodeInput, setRoomCodeInput] = useState<string>('');
-  const [showJoinModal, setShowJoinModal] = useState<boolean>(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(false);
 
   // Opponent Search state
@@ -430,33 +427,6 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
               </button>
             </div>
 
-            {/* Özel Oda Kur / Katıl */}
-            <div className="bg-[#FFFDF9] border border-[#D4C3B3] rounded-2xl p-4 flex flex-col gap-3 shadow-md">
-              <div className="flex items-center gap-2">
-                <Globe className="w-5 h-5 text-[#7A4219]" />
-                <span className="font-extrabold text-sm text-[#2C1810]">Özel Oda İle Oyna</span>
-              </div>
-              <p className="text-xs text-[#6E4223]">
-                Arkadaşınızla oynamak için bir oda kurun veya arkadaşınızın oda kodunu girin.
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => handleProtectedAction(onCreateOnlineRoom)}
-                  className="py-2.5 px-3 rounded-xl bg-[#FAF6F0] hover:bg-[#7A4219]/10 border border-[#7A4219]/30 text-[#7A4219] font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Oda Oluştur</span>
-                </button>
-                <button
-                  onClick={() => handleProtectedAction(() => setShowJoinModal(true))}
-                  className="py-2.5 px-3 rounded-xl bg-[#FAF6F0] hover:bg-[#7A4219]/10 border border-[#7A4219]/30 text-[#7A4219] font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <LogIn className="w-4 h-4" />
-                  <span>Koda Katıl</span>
-                </button>
-              </div>
-            </div>
-
             {/* Rakip Ara (Kullanıcı Adı veya E-posta) */}
             <div className="bg-[#FFFDF9] border border-[#D4C3B3] rounded-2xl p-4 flex flex-col gap-3 shadow-md">
               <div className="flex items-center justify-between">
@@ -536,8 +506,8 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
                           handleProtectedAction(() => {
                             if (onChallengeUser) {
                               onChallengeUser(user, 'dokuz-tas');
-                            } else {
-                              onCreateOnlineRoom();
+                            } else if (onQuickMatch) {
+                              onQuickMatch();
                             }
                           })
                         }
@@ -599,48 +569,6 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
         />
 
       </div>
-
-      {/* Join Room Modal Dialog */}
-      {showJoinModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-[#FFFDF9] border-2 border-[#7A4219] rounded-2xl p-6 w-full max-w-sm flex flex-col gap-4 text-[#2C1810] shadow-2xl">
-            <h3 className="text-xl font-black text-[#7A4219] text-center font-serif">
-              Odaya Katıl
-            </h3>
-            <p className="text-xs text-[#6E4223] text-center font-medium">
-              Arkadaşınızın oluşturduğu Oda Kodunu aşağıya girin:
-            </p>
-
-            <input
-              type="text"
-              value={roomCodeInput}
-              onChange={(e) => setRoomCodeInput(e.target.value)}
-              placeholder="Oda Kodunu Girin..."
-              className="bg-[#FAF6F0] border border-[#7A4219]/50 rounded-xl p-3 text-center text-sm font-bold tracking-widest text-[#2C1810] uppercase focus:outline-none focus:border-[#7A4219]"
-            />
-
-            <div className="flex items-center gap-2 mt-2">
-              <button
-                onClick={() => setShowJoinModal(false)}
-                className="flex-1 py-2.5 rounded-xl bg-[#E8DFD5] text-xs font-bold text-[#2C1810] hover:bg-[#D4C3B3] transition-colors cursor-pointer"
-              >
-                Vazgeç
-              </button>
-              <button
-                onClick={() => {
-                  if (roomCodeInput.trim()) {
-                    onJoinOnlineRoom(roomCodeInput.trim());
-                    setShowJoinModal(false);
-                  }
-                }}
-                className="flex-1 py-2.5 rounded-xl bg-[#7A4219] text-[#FFF8E7] text-xs font-extrabold hover:bg-[#8B5A2B] transition-colors cursor-pointer"
-              >
-                Katıl
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

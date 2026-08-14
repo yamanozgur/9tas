@@ -32,6 +32,7 @@ interface SplashScreenProps {
   onStart: () => void;
   onUserAuthenticated?: (user: UserProfile) => void;
   onLogout?: () => void;
+  onOpenPrivacyPolicy?: () => void;
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({
@@ -39,6 +40,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   onStart,
   onUserAuthenticated,
   onLogout,
+  onOpenPrivacyPolicy,
 }) => {
   const [authTab, setAuthTab] = useState<'register' | 'login' | 'guest'>('register');
   const [email, setEmail] = useState<string>('');
