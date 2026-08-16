@@ -4,7 +4,8 @@ import {
   handleFirestoreError,
   OperationType,
   ADMIN_EMAIL,
-  ADMIN_NAME,
+  ADMIN_RESERVED_NAMES,
+  isReservedAdminName,
   isUserAdmin
 } from './firebase';
 import { 
@@ -80,7 +81,7 @@ export function createInitialGameData(
   isAdminHost: boolean = false
 ): GameSession {
   const isUc = gameType === 'uc-tas';
-  const isHostAdmin = isAdminHost || p1Name.toLowerCase().trim() === ADMIN_NAME.toLowerCase();
+  const isHostAdmin = isAdminHost || isReservedAdminName(p1Name);
   return {
     gameId,
     gameType,
@@ -175,7 +176,7 @@ export async function joinMatchmaking(
   gameType: GameType,
   isUserAdminFlag: boolean = false
 ): Promise<{ gameId: string; unsubscribeQueue?: Unsubscribe }> {
-  const isP1Admin = isUserAdminFlag || displayName.toLowerCase().trim() === ADMIN_NAME.toLowerCase();
+  const isP1Admin = isUserAdminFlag || isReservedAdminName(displayName);
 
   // Check if there is already an open room waiting for P2 (excluding admin rooms)
   const gamesRef = collection(db, 'games');
@@ -191,7 +192,7 @@ export async function joinMatchmaking(
     const data = d.data() as GameSession;
     const isRoomAdmin = 
       data.isAdminHost || 
-      data.p1Name?.toLowerCase().trim() === ADMIN_NAME.toLowerCase();
+      isReservedAdminName(data.p1Name || '');
     
     // Regular players should never be matched with Admin test rooms, and Admin won't auto-match into regular rooms
     if (data.p1Uid !== uid && !data.p2Uid && !isRoomAdmin && !isP1Admin) {
@@ -220,8 +221,8 @@ export async function sendGameInvite(
   gameType: GameType
 ): Promise<{ gameId: string; inviteId: string }> {
   // Disallow challenging the Admin
-  if (receiverName.toLowerCase().trim() === ADMIN_NAME.toLowerCase()) {
-    throw new Error('Yönetici (The Boss) meydan okumalardan muaftır.');
+  if (isReservedAdminName(receiverName)) {
+    throw new Error('Yönetici (Admin) hesapları meydan okumalardan muaftır.');
   }
 
   // First create a waiting room
@@ -283,7 +284,7 @@ export function listenToIncomingInvites(
     return () => {};
   }
   // Exclude Admin from receiving challenge notifications
-  if (userDisplayName && userDisplayName.toLowerCase().trim() === ADMIN_NAME.toLowerCase()) {
+  if (userDisplayName && isReservedAdminName(userDisplayName)) {
     return () => {};
   }
 

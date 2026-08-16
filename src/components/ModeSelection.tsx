@@ -24,7 +24,12 @@ import {
 import { UserProfile, loginWithGoogle, searchUsersByName, formatLastSeen, isUserAdmin } from '../lib/firebase';
 import { GameMode, AIDifficulty } from '../types';
 import { BannerAd } from './BannerAd';
-import { ADMOB_CONFIG, isAdFreeLocally } from '../lib/admob';
+import { 
+  ADMOB_CONFIG, 
+  isAdFreeLocally, 
+  checkUserAdFreeStatus, 
+  formatBonusRemainingTime 
+} from '../lib/admob';
 
 interface ModeSelectionProps {
   currentUser: UserProfile | null;
@@ -37,6 +42,7 @@ interface ModeSelectionProps {
   onRequireAuth?: () => void;
   onOpenRules: () => void;
   onOpenLeaderboard: () => void;
+  onOpenPrivacyPolicy?: () => void;
   onLogout?: () => void;
   onOpenAdmin?: () => void;
   onOpenAdFreeModal?: () => void;
@@ -53,6 +59,7 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
   onRequireAuth,
   onOpenRules,
   onOpenLeaderboard,
+  onOpenPrivacyPolicy,
   onLogout,
   onOpenAdmin,
   onOpenAdFreeModal,
@@ -107,8 +114,9 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
     try {
       await onUpdateUserName(guestNameInput.trim());
       setIsEditingName(false);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert(e?.message || 'Kullanıcı adı güncellenemedi.');
     } finally {
       setIsLoadingAuth(false);
     }
@@ -140,125 +148,155 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
         </div>
 
         {/* User Profile Bar (Kullanıcı Girişi) */}
-        <div className="bg-[#FFFDF9] border-2 border-[#D4C3B3] rounded-2xl p-4 shadow-md flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8B5A2B] to-[#5C3210] text-[#FFF8E7] font-extrabold flex items-center justify-center text-lg shrink-0 border border-[#FFF]/40 shadow-sm">
-                {currentUser?.displayName?.[0]?.toUpperCase() || <User className="w-5 h-5" />}
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] text-[#7A4219] uppercase tracking-widest font-bold block">
-                  Oyuncu Profili
-                </span>
-                {isEditingName ? (
-                  <div className="flex items-center gap-2 mt-1">
-                    <input
-                      type="text"
-                      value={guestNameInput}
-                      onChange={(e) => setGuestNameInput(e.target.value)}
-                      maxLength={18}
-                      className="bg-[#F5ECE0] border border-[#8B5A2B]/50 rounded-lg px-2.5 py-1 text-xs text-[#2C1810] font-bold focus:outline-none focus:border-[#7A4219] w-36"
-                      placeholder="İsminiz..."
-                    />
-                    <button
-                      onClick={handleSaveName}
-                      disabled={isLoadingAuth}
-                      className="p-1.5 rounded-lg bg-[#7A4219] text-[#FFF8E7] font-bold text-xs hover:bg-[#8B5A2B] cursor-pointer"
-                    >
-                      <Check className="w-4 h-4" />
-                    </button>
+        {(() => {
+          const adStatus = checkUserAdFreeStatus(currentUser);
+          return (
+            <div className="bg-[#FFFDF9] border-2 border-[#D4C3B3] rounded-2xl p-4 shadow-md flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8B5A2B] to-[#5C3210] text-[#FFF8E7] font-extrabold flex items-center justify-center text-lg shrink-0 border border-[#FFF]/40 shadow-sm">
+                    {currentUser?.displayName?.[0]?.toUpperCase() || <User className="w-5 h-5" />}
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base font-bold text-[#2C1810] truncate">
-                      {currentUser?.displayName || 'Misafir Oyuncu'}
-                    </h3>
-                    {currentUser?.isAdFree && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 font-black text-[10px] shadow-2xs">
-                        <Sparkles className="w-3 h-3 text-amber-600 fill-amber-300" />
-                        <span>VIP Reklamsız</span>
-                      </span>
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-[#7A4219] uppercase tracking-widest font-bold block">
+                      Oyuncu Profili
+                    </span>
+                    {isEditingName ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="text"
+                          value={guestNameInput}
+                          onChange={(e) => setGuestNameInput(e.target.value)}
+                          maxLength={18}
+                          className="bg-[#F5ECE0] border border-[#8B5A2B]/50 rounded-lg px-2.5 py-1 text-xs text-[#2C1810] font-bold focus:outline-none focus:border-[#7A4219] w-36"
+                          placeholder="İsminiz..."
+                        />
+                        <button
+                          onClick={handleSaveName}
+                          disabled={isLoadingAuth}
+                          className="p-1.5 rounded-lg bg-[#7A4219] text-[#FFF8E7] font-bold text-xs hover:bg-[#8B5A2B] cursor-pointer"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-bold text-[#2C1810] truncate">
+                          {currentUser?.displayName || 'Misafir Oyuncu'}
+                        </h3>
+                        {adStatus.isLifetime && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 font-black text-[10px] shadow-2xs">
+                            <Sparkles className="w-3 h-3 text-amber-600 fill-amber-300" />
+                            <span>VIP Reklamsız</span>
+                          </span>
+                        )}
+                        {adStatus.isBonusActive && adStatus.bonusRemainingMs && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-900 font-black text-[10px] shadow-2xs animate-pulse">
+                            <Sparkles className="w-3 h-3 text-emerald-600 fill-emerald-300" />
+                            <span>24s Bonus: {formatBonusRemainingTime(adStatus.bonusRemainingMs)}</span>
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {isAdmin && onOpenAdmin && (
+                    <button
+                      onClick={onOpenAdmin}
+                      className="text-xs text-[#2C1810] font-black px-2.5 py-1.5 bg-[#D4AF37] border border-[#B8860B] rounded-xl hover:bg-[#B8860B] hover:text-white transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-xs"
+                      title="Yönetici Paneli"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Admin</span>
+                    </button>
+                  )}
+                  {!isEditingName && (
+                    <button
+                      onClick={() => setIsEditingName(true)}
+                      className="text-xs text-[#7A4219] font-extrabold px-2.5 py-1.5 bg-[#8B5A2B]/10 border border-[#8B5A2B]/30 rounded-xl hover:bg-[#8B5A2B]/20 transition-colors cursor-pointer shrink-0"
+                    >
+                      İsim Değiştir
+                    </button>
+                  )}
+                  {onLogout && (
+                    <button
+                      onClick={onLogout}
+                      className="text-xs text-red-700 font-extrabold px-2.5 py-1.5 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                      title="Çıkış Yap"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Çıkış Yap</span>
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-1.5 shrink-0">
-              {isAdmin && onOpenAdmin && (
-                <button
-                  onClick={onOpenAdmin}
-                  className="text-xs text-[#2C1810] font-black px-2.5 py-1.5 bg-[#D4AF37] border border-[#B8860B] rounded-xl hover:bg-[#B8860B] hover:text-white transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-xs"
-                  title="Yönetici Paneli"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Admin</span>
-                </button>
-              )}
-              {!isEditingName && (
-                <button
-                  onClick={() => setIsEditingName(true)}
-                  className="text-xs text-[#7A4219] font-extrabold px-2.5 py-1.5 bg-[#8B5A2B]/10 border border-[#8B5A2B]/30 rounded-xl hover:bg-[#8B5A2B]/20 transition-colors cursor-pointer shrink-0"
-                >
-                  İsim Değiştir
-                </button>
-              )}
-              {onLogout && (
-                <button
-                  onClick={onLogout}
-                  className="text-xs text-red-700 font-extrabold px-2.5 py-1.5 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                  title="Çıkış Yap"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Çıkış Yap</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Ad-Free Upgrade Banner (If not ad-free) */}
-          {!currentUser?.isAdFree && !isAdFreeLocally() && onOpenAdFreeModal && (
-            <div className="pt-2 border-t border-[#E8DFD5]">
-              <button
-                type="button"
-                onClick={onOpenAdFreeModal}
-                className="w-full p-2.5 rounded-xl bg-gradient-to-r from-[#2C1810] via-[#5C3210] to-[#2C1810] text-[#FFF8E7] shadow-sm hover:brightness-110 active:scale-[0.99] transition-all cursor-pointer flex items-center justify-between border border-[#D4AF37]/40 group"
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#B8860B] flex items-center justify-center text-[#2C1810] shadow-xs shrink-0">
-                    <Crown className="w-4 h-4 fill-[#2C1810]/20" />
+              {/* 24-Hour Welcome Bonus Info Banner */}
+              {adStatus.isBonusActive && adStatus.bonusRemainingMs && (
+                <div className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-300/80 flex items-center justify-between gap-2 shadow-2xs">
+                  <div className="flex items-center gap-2 text-xs text-emerald-950 font-bold">
+                    <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>🎉 İlk üyeliğinize özel 24 saat reklamsız oynama bonusunuz aktif! ({formatBonusRemainingTime(adStatus.bonusRemainingMs)} kaldı)</span>
                   </div>
-                  <div className="text-left">
-                    <span className="text-xs font-black text-[#FFF8E7] block leading-tight">
-                      Reklamları Kaldır
-                    </span>
-                    <span className="text-[10px] text-[#D4AF37] font-semibold block">
-                      Kesintisiz oyun keyfi için tek seferlik ödeme
-                    </span>
-                  </div>
+                  {onOpenAdFreeModal && (
+                    <button
+                      type="button"
+                      onClick={onOpenAdFreeModal}
+                      className="text-[10px] font-black text-emerald-800 hover:text-emerald-950 underline shrink-0 cursor-pointer"
+                    >
+                      Kalıcı Yap
+                    </button>
+                  )}
                 </div>
-                <div className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-black text-xs shadow-xs border border-yellow-200/40 shrink-0 group-hover:scale-105 transition-transform">
-                  {ADMOB_CONFIG.adFreePriceText}
-                </div>
-              </button>
-            </div>
-          )}
+              )}
 
-          {/* Optional Google Login Button */}
-          {!currentUser?.email && (
-            <div className="pt-2 border-t border-[#E8DFD5] flex items-center justify-between gap-2">
-              <span className="text-xs text-[#6E4223] font-medium">Çevrimiçi başarım ve davetler için:</span>
-              <button
-                onClick={handleGoogleLogin}
-                disabled={isLoadingAuth}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#7A4219]/10 hover:bg-[#7A4219]/20 border border-[#7A4219]/30 text-xs font-bold text-[#7A4219] transition-all cursor-pointer shrink-0"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Google ile Gir</span>
-              </button>
+              {/* Ad-Free Upgrade Banner (If not ad-free or bonus expired) */}
+              {!adStatus.isAdFree && onOpenAdFreeModal && (
+                <div className="pt-2 border-t border-[#E8DFD5]">
+                  <button
+                    type="button"
+                    onClick={onOpenAdFreeModal}
+                    className="w-full p-2.5 rounded-xl bg-gradient-to-r from-[#2C1810] via-[#5C3210] to-[#2C1810] text-[#FFF8E7] shadow-sm hover:brightness-110 active:scale-[0.99] transition-all cursor-pointer flex items-center justify-between border border-[#D4AF37]/40 group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#B8860B] flex items-center justify-center text-[#2C1810] shadow-xs shrink-0">
+                        <Crown className="w-4 h-4 fill-[#2C1810]/20" />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-xs font-black text-[#FFF8E7] block leading-tight">
+                          Reklamları Kaldır
+                        </span>
+                        <span className="text-[10px] text-[#D4AF37] font-semibold block">
+                          Kesintisiz oyun keyfi için tek seferlik ödeme
+                        </span>
+                      </div>
+                    </div>
+                    <div className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-black text-xs shadow-xs border border-yellow-200/40 shrink-0 group-hover:scale-105 transition-transform">
+                      {ADMOB_CONFIG.adFreePriceText}
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {/* Optional Google Login Button */}
+              {!currentUser?.email && (
+                <div className="pt-2 border-t border-[#E8DFD5] flex items-center justify-between gap-2">
+                  <span className="text-xs text-[#6E4223] font-medium">Çevrimiçi başarım ve davetler için:</span>
+                  <button
+                    onClick={handleGoogleLogin}
+                    disabled={isLoadingAuth}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#7A4219]/10 hover:bg-[#7A4219]/20 border border-[#7A4219]/30 text-xs font-bold text-[#7A4219] transition-all cursor-pointer shrink-0"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Google ile Gir</span>
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
 
         {/* Tab Selection: Çevrimdışı / Çevrimiçi */}
         <div className="grid grid-cols-2 p-1.5 bg-[#EFE7DC] border border-[#D4C3B3] rounded-2xl gap-2 shadow-inner">
@@ -531,8 +569,8 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
         )}
 
 
-        {/* Footer Links (Leaderboard, Rules & Admin) */}
-        <div className="flex items-center justify-center gap-3 pt-2 flex-wrap">
+        {/* Footer Links (Leaderboard, Rules, Privacy Policy & Admin) */}
+        <div className="flex items-center justify-center gap-2.5 pt-2 flex-wrap">
           <button
             onClick={onOpenLeaderboard}
             className="text-xs font-bold text-[#7A4219] hover:text-[#5C3210] bg-[#FFFDF9] border border-[#D4C3B3] px-3 py-1.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer transition-colors"
@@ -548,6 +586,16 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
             <Award className="w-4 h-4 text-[#7A4219]" />
             <span>Kurallar</span>
           </button>
+
+          {onOpenPrivacyPolicy && (
+            <button
+              onClick={onOpenPrivacyPolicy}
+              className="text-xs font-bold text-[#7A4219] hover:text-[#5C3210] bg-[#FFFDF9] border border-[#D4C3B3] px-3 py-1.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <ShieldCheck className="w-4 h-4 text-[#7A4219]" />
+              <span>Gizlilik Politikası</span>
+            </button>
+          )}
 
           {isAdmin && onOpenAdmin && (
             <button
@@ -567,6 +615,13 @@ export const ModeSelection: React.FC<ModeSelectionProps> = ({
           isAdFree={Boolean(currentUser?.isAdFree || isAdFreeLocally())} 
           onOpenAdFreeModal={onOpenAdFreeModal}
         />
+
+        {/* Creators / App Footer Credit */}
+        <div className="pt-2 pb-1 text-center select-none">
+          <p className="text-[11px] font-semibold text-[#8B6B58] tracking-wide">
+            © 2026 — Created by <span className="text-[#7A4219] font-bold">Özgür Yaman</span> &amp; <span className="text-[#7A4219] font-bold">Yaman Tatar</span>
+          </p>
+        </div>
 
       </div>
     </div>

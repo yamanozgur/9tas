@@ -13,9 +13,11 @@ import { AdminPanelModal } from './components/AdminPanelModal';
 import { BannerAd } from './components/BannerAd';
 import { VideoAdModal } from './components/VideoAdModal';
 import { AdFreeModal } from './components/AdFreeModal';
+import { BonusExpiredModal } from './components/BonusExpiredModal';
 import { IncomingInviteModal } from './components/IncomingInviteModal';
 import { OutgoingInviteModal } from './components/OutgoingInviteModal';
 import { AuthRequiredModal } from './components/AuthRequiredModal';
+import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { 
   auth, 
   syncUserProfile, 
@@ -33,7 +35,9 @@ import {
   incrementGameCountAndCheckAd,
   getPlayedGamesCount,
   isAdFreeLocally,
-  saveAdFreeLocally
+  saveAdFreeLocally,
+  checkUserAdFreeStatus,
+  markBonusExpiredNoticeDismissed
 } from './lib/admob';
 import {
   GameSession,
@@ -63,9 +67,11 @@ export default function App() {
   const [gameMode, setGameMode] = useState<GameMode>('vs-ai');
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('impossible');
   const [isRulesOpen, setIsRulesOpen] = useState<boolean>(false);
+  const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState<boolean>(false);
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
   const [isAdFreeModalOpen, setIsAdFreeModalOpen] = useState<boolean>(false);
+  const [isBonusExpiredModalOpen, setIsBonusExpiredModalOpen] = useState<boolean>(false);
 
   // Ads & Game Count State (Persisted in localStorage across sessions)
   const [gamesPlayedCount, setGamesPlayedCount] = useState<number>(() => getPlayedGamesCount());
@@ -178,6 +184,15 @@ export default function App() {
     });
   };
 
+  // 1a. Check 24-Hour Ad-Free Welcome Bonus Expiration Notice
+  useEffect(() => {
+    if (!currentUser || !currentUser.uid) return;
+    const status = checkUserAdFreeStatus(currentUser);
+    if (status.bonusExpiredJustNow) {
+      setIsBonusExpiredModalOpen(true);
+    }
+  }, [currentUser]);
+
   // 1b. Active Presence Heartbeat & Auto Offline Cleanup
   useEffect(() => {
     if (!currentUser || !currentUser.uid || currentUser.uid === 'guest_user' || currentUser.uid.startsWith('guest_')) return;
@@ -288,12 +303,12 @@ export default function App() {
     if (winner) {
       setIsGameOverModalOpen(true);
 
-      // Increment played games counter & check for 5th game video ad (skip if user has ad-free status)
-      const userHasAdFree = Boolean(currentUser?.isAdFree || isAdFreeLocally());
+      // Increment played games counter & check for 5th game video ad (skip if user has VIP or 24h bonus)
+      const adStatus = checkUserAdFreeStatus(currentUser);
       const { count, shouldShowAd } = incrementGameCountAndCheckAd();
       setGamesPlayedCount(count);
 
-      if (shouldShowAd && !userHasAdFree) {
+      if (shouldShowAd && !adStatus.isAdFree) {
         setIsVideoAdOpen(true);
       }
 
@@ -826,8 +841,20 @@ export default function App() {
   // Update user name
   const handleUpdateUserName = async (newName: string) => {
     if (!currentUser) return;
-    const updated = await syncUserProfile({ uid: currentUser.uid } as any, newName);
+    const updated = await syncUserProfile({ uid: currentUser.uid, email: currentUser.email } as any, newName);
     setCurrentUser(updated);
+    
+    // Update local storage if fallback user
+    const localEmailUser = localStorage.getItem('local_email_user');
+    if (localEmailUser) {
+      try {
+        const parsed = JSON.parse(localEmailUser);
+        if (parsed.uid === currentUser.uid) {
+          parsed.displayName = newName;
+          localStorage.setItem('local_email_user', JSON.stringify(parsed));
+        }
+      } catch (e) {}
+    }
   };
 
   // Valid move calculations for selected stone
@@ -879,6 +906,7 @@ export default function App() {
             setCurrentUser(profile);
             setScreen('menu');
           }}
+          onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
           onLogout={handleLogout}
         />
       )}
@@ -902,6 +930,7 @@ export default function App() {
           onRequireAuth={() => setIsAuthRequiredModalOpen(true)}
           onOpenRules={() => setIsRulesOpen(true)}
           onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
+          onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
           onLogout={handleLogout}
           onOpenAdmin={() => setIsAdminOpen(true)}
           onOpenAdFreeModal={() => setIsAdFreeModalOpen(true)}
@@ -998,7 +1027,7 @@ export default function App() {
             <BannerAd 
               placement="game" 
               className="mt-2 shrink-0" 
-              isAdFree={Boolean(currentUser?.isAdFree || isAdFreeLocally())} 
+              isAdFree={checkUserAdFreeStatus(currentUser).isAdFree} 
               onOpenAdFreeModal={() => setIsAdFreeModalOpen(true)}
             />
           </main>
@@ -1028,10 +1057,34 @@ export default function App() {
         />
       )}
 
+      {/* 24-Hour Welcome Bonus Expired Modal */}
+      <BonusExpiredModal
+        isOpen={isBonusExpiredModalOpen}
+        onClose={() => {
+          setIsBonusExpiredModalOpen(false);
+          if (currentUser?.uid) {
+            markBonusExpiredNoticeDismissed(currentUser.uid);
+          }
+        }}
+        onOpenAdFreeModal={() => {
+          setIsBonusExpiredModalOpen(false);
+          if (currentUser?.uid) {
+            markBonusExpiredNoticeDismissed(currentUser.uid);
+          }
+          setIsAdFreeModalOpen(true);
+        }}
+      />
+
       {/* Rules Modal */}
       <RulesModal
         isOpen={isRulesOpen}
         onClose={() => setIsRulesOpen(false)}
+      />
+
+      {/* Privacy Policy Modal */}
+      <PrivacyPolicyModal
+        isOpen={isPrivacyPolicyOpen}
+        onClose={() => setIsPrivacyPolicyOpen(false)}
       />
 
       {/* Leaderboard Modal */}

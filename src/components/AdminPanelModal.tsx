@@ -20,16 +20,23 @@ import {
   CheckCircle2,
   Trash2,
   AlertTriangle,
-  User
+  User,
+  History,
+  GitCommit,
+  Clock,
+  Zap,
+  Timer
 } from 'lucide-react';
 import { 
   fetchAllUsersAdmin, 
   toggleUserAdFreeStatus, 
   cleanupGuestUsersAdmin,
+  isUserAdmin,
   UserProfile, 
   isUserCurrentlyOnline, 
   formatLastSeen 
 } from '../lib/firebase';
+import { checkUserAdFreeStatus, formatBonusRemainingTime } from '../lib/admob';
 
 interface AdminPanelModalProps {
   isOpen: boolean;
@@ -45,7 +52,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'registered' | 'guests'>('registered');
+  const [activeTab, setActiveTab] = useState<'registered' | 'guests' | 'history'>('registered');
   const [registeredSubFilter, setRegisteredSubFilter] = useState<'all' | 'online' | 'adfree'>('all');
   const [copiedUid, setCopiedUid] = useState<string | null>(null);
   const [updatingUid, setUpdatingUid] = useState<string | null>(null);
@@ -279,8 +286,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             </div>
           </div>
 
-          {/* Primary View Toggle: Kayıtlı Üyeler vs Misafirler */}
-          <div className="flex items-center gap-2 border-b border-[#7A4219]/20 pb-2">
+          {/* Primary View Toggle: Kayıtlı Üyeler vs Misafirler vs Değişiklik Geçmişi */}
+          <div className="flex items-center gap-2 border-b border-[#7A4219]/20 pb-2 flex-wrap">
             <button
               onClick={() => {
                 setActiveTab('registered');
@@ -310,7 +317,97 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               <User className="w-4 h-4" />
               <span>Eski Misafir Kayıtları ({guestUsers.length})</span>
             </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('history');
+                setSearchTerm('');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'history'
+                  ? 'bg-amber-800 text-[#FFF8E7] shadow-md'
+                  : 'bg-[#FAF6F0] text-[#6E4223] hover:bg-amber-100'
+              }`}
+            >
+              <History className="w-4 h-4 text-amber-500" />
+              <span>Action History & Yama Notları</span>
+            </button>
           </div>
+
+          {/* Tab 3: Action History & Version Changelog */}
+          {activeTab === 'history' && (
+            <div className="space-y-4">
+              <div className="bg-[#FAF6F0] border border-[#7A4219]/20 rounded-2xl p-4 sm:p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-900">
+                    <GitCommit className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-[#2C1810]">Son Yapılan Değişiklikler ve Özellikler (Push Özeti)</h3>
+                    <p className="text-xs text-[#7A4219] font-medium">Sistem güncellemeleri, kural motoru ve kullanıcı yetkilendirme kayıtları</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Item 1: 24h bonus */}
+                  <div className="p-3.5 bg-white border border-[#7A4219]/15 rounded-xl space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-900 bg-emerald-100 px-2.5 py-0.5 rounded-full">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                        24 Saatlik Reklamsız Üyelik Bonusu
+                      </span>
+                      <span className="text-[11px] font-bold text-gray-500">v1.4.0</span>
+                    </div>
+                    <p className="text-xs text-[#2C1810] leading-relaxed">
+                      Yeni kayıt olan tüm üyelere ilk 24 saat boyunca tüm banner ve geçiş reklamları otomatik kaldırılır. 24 saat bitiminde kullanıcıya özel bildirim ve tek seferlik VIP avantajı gösterilir.
+                    </p>
+                  </div>
+
+                  {/* Item 2: Admin Reserved Names */}
+                  <div className="p-3.5 bg-white border border-[#7A4219]/15 rounded-xl space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-black text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full">
+                        <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
+                        Özel İsim Rezervasyonu (Admin Koruması)
+                      </span>
+                      <span className="text-[11px] font-bold text-gray-500">v1.3.5</span>
+                    </div>
+                    <p className="text-xs text-[#2C1810] leading-relaxed">
+                      <strong>The Boss, Dayı, Patron, El Patron, Mata Leao</strong> kullanıcı adları yalnızca admin (<code className="bg-stone-100 px-1 rounded text-[11px]">yamanozgur@gmail.com</code>) ile eşleştirildi. Başka kullanıcıların alması engellendi.
+                    </p>
+                  </div>
+
+                  {/* Item 3: 15s Timer & 2x Move Limit */}
+                  <div className="p-3.5 bg-white border border-[#7A4219]/15 rounded-xl space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-black text-blue-900 bg-blue-100 px-2.5 py-0.5 rounded-full">
+                        <Timer className="w-3.5 h-3.5 text-blue-700" />
+                        15 Saniye Hamle Sayacı & 2x Tekrar Kuralı
+                      </span>
+                      <span className="text-[11px] font-bold text-gray-500">v1.3.0</span>
+                    </div>
+                    <p className="text-xs text-[#2C1810] leading-relaxed">
+                      Sırası gelen oyuncuya 15 saniyelik görsel geri sayım eklendi. Aynı hamleyi peş peşe en fazla 2 defa yapabilme kuralı devreye alındı.
+                    </p>
+                  </div>
+
+                  {/* Item 4: Guest DB Cleanup */}
+                  <div className="p-3.5 bg-white border border-[#7A4219]/15 rounded-xl space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-black text-purple-900 bg-purple-100 px-2.5 py-0.5 rounded-full">
+                        <Trash2 className="w-3.5 h-3.5 text-purple-700" />
+                        Eski Misafir Kayıtlarını Veritabanından Temizleme
+                      </span>
+                      <span className="text-[11px] font-bold text-gray-500">v1.2.5</span>
+                    </div>
+                    <p className="text-xs text-[#2C1810] leading-relaxed">
+                      Misafir kullanıcıların çevrimdışı oynatılması sağlandı ve veritabanındaki eski gereksiz misafir dökümleri toplu silme butonuyla temizlenebilir kılındı.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Tab 2 Special Banner: Guest DB Cleanup info */}
           {activeTab === 'guests' && (
@@ -421,7 +518,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       const dtLosses = u.stats?.dokuzTasLosses || 0;
                       const utWins = u.stats?.ucTasWins || 0;
                       const utLosses = u.stats?.ucTasLosses || 0;
-                      const isAdmin = u.email === 'yamanozgur@gmail.com';
+                      const isAdmin = isUserAdmin(u);
                       const isUserAdFree = !!u.isAdFree;
                       const isUpdatingThisUser = updatingUid === u.uid;
                       const isOnline = isUserCurrentlyOnline(u);
@@ -509,46 +606,71 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
                           <td className="py-3 px-4 text-center">
                             <div className="flex items-center justify-center gap-2">
-                              {isUserAdFree ? (
-                                <>
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 font-black text-[10px] shadow-xs">
-                                    <Sparkles className="w-3 h-3 text-amber-600 fill-amber-400" />
-                                    <span>Reklamsız (VIP)</span>
-                                  </span>
-                                  <button
-                                    onClick={() => handleToggleAdFree(u)}
-                                    disabled={isUpdatingThisUser}
-                                    className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[10px] border border-red-200 transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
-                                    title="Reklamsız üyeliği kaldır"
-                                  >
-                                    {isUpdatingThisUser ? (
-                                      <Loader2 className="w-3 h-3 animate-spin text-red-700" />
-                                    ) : (
-                                      <VolumeX className="w-3 h-3" />
-                                    )}
-                                    <span>Kaldır</span>
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 font-bold text-[10px]">
-                                    <span>Standart</span>
-                                  </span>
-                                  <button
-                                    onClick={() => handleToggleAdFree(u)}
-                                    disabled={isUpdatingThisUser}
-                                    className="px-3 py-1 rounded-lg bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-600 hover:brightness-110 text-white font-black text-[10px] shadow-xs transition-all cursor-pointer flex items-center gap-1 border border-amber-400/40 active:scale-95 disabled:opacity-50"
-                                    title="Kullanıcıya reklamsız üyelik tanımla"
-                                  >
-                                    {isUpdatingThisUser ? (
-                                      <Loader2 className="w-3 h-3 animate-spin text-white" />
-                                    ) : (
-                                      <Sparkles className="w-3 h-3 text-yellow-100 fill-yellow-200" />
-                                    )}
-                                    <span>Reklamsız Yap</span>
-                                  </button>
-                                </>
-                              )}
+                              {(() => {
+                                const adStatus = checkUserAdFreeStatus(u);
+                                if (adStatus.isLifetime) {
+                                  return (
+                                    <>
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 font-black text-[10px] shadow-xs">
+                                        <Sparkles className="w-3 h-3 text-amber-600 fill-amber-400" />
+                                        <span>Kalıcı VIP</span>
+                                      </span>
+                                      <button
+                                        onClick={() => handleToggleAdFree(u)}
+                                        disabled={isUpdatingThisUser}
+                                        className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[10px] border border-red-200 transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                                        title="Reklamsız üyeliği kaldır"
+                                      >
+                                        {isUpdatingThisUser ? (
+                                          <Loader2 className="w-3 h-3 animate-spin text-red-700" />
+                                        ) : (
+                                          <VolumeX className="w-3 h-3" />
+                                        )}
+                                        <span>Kaldır</span>
+                                      </button>
+                                    </>
+                                  );
+                                }
+                                if (adStatus.isBonusActive && adStatus.bonusRemainingMs) {
+                                  return (
+                                    <>
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-900 font-black text-[10px]">
+                                        <Clock className="w-3 h-3 text-emerald-600" />
+                                        <span>24s Bonus ({formatBonusRemainingTime(adStatus.bonusRemainingMs)})</span>
+                                      </span>
+                                      <button
+                                        onClick={() => handleToggleAdFree(u)}
+                                        disabled={isUpdatingThisUser}
+                                        className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] shadow-xs cursor-pointer flex items-center gap-1"
+                                        title="Kalıcı VIP'ye yükselt"
+                                      >
+                                        <Sparkles className="w-3 h-3 text-yellow-200" />
+                                        <span>Kalıcı Yap</span>
+                                      </button>
+                                    </>
+                                  );
+                                }
+                                return (
+                                  <>
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 font-bold text-[10px]">
+                                      <span>Standart</span>
+                                    </span>
+                                    <button
+                                      onClick={() => handleToggleAdFree(u)}
+                                      disabled={isUpdatingThisUser}
+                                      className="px-3 py-1 rounded-lg bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-600 hover:brightness-110 text-white font-black text-[10px] shadow-xs transition-all cursor-pointer flex items-center gap-1 border border-amber-400/40 active:scale-95 disabled:opacity-50"
+                                      title="Kullanıcıya kalıcı reklamsız üyelik tanımla"
+                                    >
+                                      {isUpdatingThisUser ? (
+                                        <Loader2 className="w-3 h-3 animate-spin text-white" />
+                                      ) : (
+                                        <Sparkles className="w-3 h-3 text-yellow-100 fill-yellow-200" />
+                                      )}
+                                      <span>Reklamsız Yap</span>
+                                    </button>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </td>
                         </tr>

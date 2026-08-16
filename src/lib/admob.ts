@@ -42,7 +42,128 @@ export const STORAGE_KEYS = {
   PLAYED_GAMES_COUNT: 'dokuztas_played_games_count',
   IS_AD_FREE_PURCHASED: 'guest_is_ad_free',
   LOCAL_USER: 'local_email_user',
+  DISMISSED_BONUS_EXPIRED_NOTICES: 'dismissed_bonus_expired_notices',
 };
+
+export const NEW_USER_BONUS_HOURS = 24;
+export const NEW_USER_BONUS_MS = NEW_USER_BONUS_HOURS * 60 * 60 * 1000;
+
+export interface AdFreeStatus {
+  isAdFree: boolean;
+  isLifetime: boolean;
+  isBonusActive: boolean;
+  bonusExpiresAt?: number;
+  bonusRemainingMs?: number;
+  bonusExpiredJustNow?: boolean;
+}
+
+/**
+ * Checks the full ad-free status of a user (Lifetime VIP vs 24-hour New Member Bonus)
+ */
+export function checkUserAdFreeStatus(user?: {
+  uid?: string;
+  email?: string;
+  isAdFree?: boolean;
+  registeredAt?: string | number;
+} | null): AdFreeStatus {
+  // 1. Permanent/Purchased VIP or Admin toggle
+  if (user?.isAdFree) {
+    return { isAdFree: true, isLifetime: true, isBonusActive: false };
+  }
+
+  // 2. Check local lifetime purchase flag
+  try {
+    if (localStorage.getItem(STORAGE_KEYS.IS_AD_FREE_PURCHASED) === 'true') {
+      return { isAdFree: true, isLifetime: true, isBonusActive: false };
+    }
+  } catch {}
+
+  // 3. Registered member 24-hour Welcome Bonus Check
+  const hasEmailOrReg = Boolean(user?.email || (user?.uid && !user.uid.startsWith('guest_') && user.uid !== 'guest_user'));
+  
+  if (hasEmailOrReg && user?.registeredAt) {
+    const regTime = typeof user.registeredAt === 'number' 
+      ? user.registeredAt 
+      : new Date(user.registeredAt).getTime();
+
+    if (!isNaN(regTime)) {
+      const expiresAt = regTime + NEW_USER_BONUS_MS;
+      const now = Date.now();
+      const remainingMs = expiresAt - now;
+
+      if (remainingMs > 0) {
+        return {
+          isAdFree: true,
+          isLifetime: false,
+          isBonusActive: true,
+          bonusExpiresAt: expiresAt,
+          bonusRemainingMs: remainingMs,
+        };
+      } else {
+        // Bonus expired. Check if user already saw the expired notification
+        const isDismissed = isBonusExpiredNoticeDismissed(user.uid || '');
+        return {
+          isAdFree: false,
+          isLifetime: false,
+          isBonusActive: false,
+          bonusExpiresAt: expiresAt,
+          bonusExpiredJustNow: !isDismissed,
+        };
+      }
+    }
+  }
+
+  return {
+    isAdFree: false,
+    isLifetime: false,
+    isBonusActive: false,
+  };
+}
+
+/**
+ * Check if the user already dismissed the "Bonus Expired" banner/modal
+ */
+export function isBonusExpiredNoticeDismissed(uid: string): boolean {
+  if (!uid) return true;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DISMISSED_BONUS_EXPIRED_NOTICES);
+    if (!raw) return false;
+    const list: string[] = JSON.parse(raw);
+    return list.includes(uid);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Mark the bonus expired notice as acknowledged so it won't keep popping up
+ */
+export function markBonusExpiredNoticeDismissed(uid: string): void {
+  if (!uid) return;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DISMISSED_BONUS_EXPIRED_NOTICES);
+    const list: string[] = raw ? JSON.parse(raw) : [];
+    if (!list.includes(uid)) {
+      list.push(uid);
+      localStorage.setItem(STORAGE_KEYS.DISMISSED_BONUS_EXPIRED_NOTICES, JSON.stringify(list));
+    }
+  } catch {}
+}
+
+/**
+ * Format remaining bonus time (e.g., "18 saat 24 dk")
+ */
+export function formatBonusRemainingTime(remainingMs: number): string {
+  if (remainingMs <= 0) return '0 dk';
+  const totalMin = Math.floor(remainingMs / 60000);
+  const hours = Math.floor(totalMin / 60);
+  const minutes = totalMin % 60;
+
+  if (hours > 0) {
+    return `${hours} sa ${minutes} dk`;
+  }
+  return `${minutes} dakika`;
+}
 
 /**
  * Get current played games counter

@@ -16,7 +16,9 @@ import {
   Eye,
   EyeOff,
   KeyRound,
-  X
+  X,
+  Sparkles,
+  Clock
 } from 'lucide-react';
 import { 
   loginWithEmail, 
@@ -176,9 +178,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
     try {
       const profile = await loginAsGuest(finalGuestName);
       handleAuthSuccess(profile);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setErrorMsg('Misafir girişi yapılamadı.');
+      setErrorMsg(err?.message || 'Misafir girişi yapılamadı.');
     } finally {
       setIsLoading(false);
     }
@@ -411,6 +413,17 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
           {/* TAB 2: ÜYE OL */}
           {authTab === 'register' && (
             <form onSubmit={handleEmailRegister} className="flex flex-col gap-3">
+              {/* 24-Hour Ad-Free Bonus Highlight */}
+              <div className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-300 text-emerald-950 flex items-start gap-2">
+                <div className="p-1 bg-emerald-100 rounded-lg text-emerald-700 shrink-0 mt-0.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+                <div className="text-[11px] leading-tight">
+                  <span className="font-black text-emerald-900 block">Hoş Geldin Hediyesi: 24 Saat Reklamsız!</span>
+                  <span className="text-emerald-800/90 font-medium">Şimdi üye olun, ilk 24 saat boyunca hiçbir reklam veya bekleme süresi olmadan oynayın.</span>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-[#7A4219] mb-1">Oyuncu Adı</label>
                 <div className="relative">

@@ -485,7 +485,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, 
         {/* Footer */}
         <div className="pt-3 border-t border-[#D4C3B3] flex items-center justify-between shrink-0">
           <span className="text-[11px] text-[#A89280]">
-            Dokuz Taş © 2026 • Özgür YAMAN
+            Dokuz Taş © 2026 • Created by Özgür Yaman &amp; Yaman Tatar
           </span>
           <button
             onClick={onClose}

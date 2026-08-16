@@ -40,14 +40,14 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 
 export const auth = getAuth(app);
 
-// Robust Firestore Initialization with reliable long-polling for sandboxed environments
+// Robust Firestore Initialization with fallback and auto-detecting transport for iframe/sandboxed environments
 let dbInstance;
 const databaseId = firebaseConfig.firestoreDatabaseId || undefined;
 try {
   dbInstance = initializeFirestore(
     app, 
     {
-      experimentalForceLongPolling: true,
+      experimentalAutoDetectLongPolling: true,
     }, 
     databaseId
   );
@@ -112,7 +112,43 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 export const ADMIN_EMAIL = 'yamanozgur@gmail.com';
-export const ADMIN_NAME = 'The Boss';
+export const ADMIN_RESERVED_NAMES = [
+  'The Boss',
+  'Dayı',
+  'Patron',
+  'El Patron',
+  'Mata Leao',
+];
+
+/**
+ * Checks if a specific nickname is reserved exclusively for the Admin
+ */
+export function isReservedAdminName(name: string): boolean {
+  if (!name) return false;
+  const clean = name.toLowerCase().trim();
+  return ADMIN_RESERVED_NAMES.some((n) => n.toLowerCase().trim() === clean);
+}
+
+/**
+ * Validates if the user is allowed to claim/use a given displayName
+ */
+export function validateUsernameClaim(
+  displayName: string,
+  userEmail?: string | null
+): { allowed: boolean; reason?: string } {
+  const isReserved = isReservedAdminName(displayName);
+  if (!isReserved) return { allowed: true };
+
+  const isAdminEmail = userEmail && userEmail.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase();
+  if (isAdminEmail) {
+    return { allowed: true };
+  }
+
+  return {
+    allowed: false,
+    reason: `"${displayName}" kullanıcı adı Sistem Yöneticisine (Admin) aittir ve başka kullanıcılar tarafından alınamaz.`
+  };
+}
 
 /**
  * Checks if a given profile or email/displayName belongs to the Admin
@@ -120,7 +156,7 @@ export const ADMIN_NAME = 'The Boss';
 export function isUserAdmin(user?: { email?: string | null; displayName?: string | null } | null): boolean {
   if (!user) return false;
   const emailMatch = user.email ? user.email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase() : false;
-  const nameMatch = user.displayName ? user.displayName.toLowerCase().trim() === ADMIN_NAME.toLowerCase() : false;
+  const nameMatch = user.displayName ? isReservedAdminName(user.displayName) : false;
   return Boolean(emailMatch || nameMatch);
 }
 
@@ -131,6 +167,7 @@ export interface UserProfile {
   photoURL?: string;
   isOnline: boolean;
   lastSeen?: string | number;
+  registeredAt?: string | number;
   isAdFree?: boolean;
   friendIds: string[];
   friendRequestsSent: string[];
@@ -217,7 +254,18 @@ export async function syncUserProfile(user: User, customName?: string): Promise<
   const userRef = doc(db, 'users', user.uid);
   const snap = await getDoc(userRef);
 
-  const name = customName || user.displayName || `Oyuncu-${user.uid.slice(0, 5)}`;
+  let requestedName = (customName || user.displayName || `Oyuncu-${user.uid.slice(0, 5)}`).trim();
+  
+  // Guard reserved admin names against unauthorized accounts
+  const validation = validateUsernameClaim(requestedName, user.email);
+  if (!validation.allowed) {
+    if (customName) {
+      throw new Error(validation.reason);
+    }
+    requestedName = `Oyuncu-${user.uid.slice(0, 5)}`;
+  }
+
+  const name = requestedName;
   const photo = user.photoURL || '';
   const nowIso = new Date().toISOString();
 
@@ -229,6 +277,7 @@ export async function syncUserProfile(user: User, customName?: string): Promise<
       photoURL: photo,
       isOnline: true,
       lastSeen: nowIso,
+      registeredAt: nowIso,
       friendIds: [],
       friendRequestsSent: [],
       friendRequestsReceived: [],
@@ -242,9 +291,14 @@ export async function syncUserProfile(user: User, customName?: string): Promise<
     await setDoc(userRef, newProfile);
     return newProfile;
   } else {
+    const existingData = snap.data() as UserProfile;
+    // If existing user has no registeredAt, persist their existing creation timestamp or fallback to now
+    const registeredAt = existingData.registeredAt || nowIso;
+
     await updateDoc(userRef, {
       isOnline: true,
       lastSeen: nowIso,
+      registeredAt,
       ...(customName ? { displayName: customName } : {})
     });
     const updatedSnap = await getDoc(userRef);
@@ -284,7 +338,15 @@ export async function loginWithEmail(email: string, pass: string): Promise<UserP
 async function fallbackEmailRegister(email: string, pass: string, displayName: string): Promise<UserProfile> {
   const cleanEmail = email.trim().toLowerCase();
   const customUid = 'usr_' + Math.random().toString(36).substring(2, 11);
-  const name = displayName.trim() || cleanEmail.split('@')[0];
+  const rawName = displayName.trim() || cleanEmail.split('@')[0];
+  
+  // Guard reserved admin names
+  const validation = validateUsernameClaim(rawName, cleanEmail);
+  if (!validation.allowed) {
+    throw new Error(validation.reason);
+  }
+
+  const name = rawName;
   const nowIso = new Date().toISOString();
 
   const newProfile: UserProfile = {
@@ -293,6 +355,7 @@ async function fallbackEmailRegister(email: string, pass: string, displayName: s
     email: cleanEmail,
     isOnline: true,
     lastSeen: nowIso,
+    registeredAt: nowIso,
     friendIds: [],
     friendRequestsSent: [],
     friendRequestsReceived: [],
@@ -340,6 +403,8 @@ async function fallbackEmailLogin(email: string, pass: string): Promise<UserProf
         email: docData.email,
         photoURL: docData.photoURL,
         isOnline: true,
+        lastSeen: new Date().toISOString(),
+        registeredAt: docData.registeredAt || docData.lastSeen || new Date().toISOString(),
         isAdFree: !!docData.isAdFree,
         friendIds: docData.friendIds || [],
         friendRequestsSent: docData.friendRequestsSent || [],
@@ -404,6 +469,12 @@ export async function loginAsGuest(guestName: string): Promise<UserProfile> {
   }
   localStorage.removeItem('local_email_user');
 
+  const trimmed = (guestName || 'Misafir Oyuncu').trim();
+  const validation = validateUsernameClaim(trimmed, null);
+  if (!validation.allowed) {
+    throw new Error(validation.reason);
+  }
+
   // Local guest user profile stored in localStorage (0 Firestore writes)
   let localGuestUid = localStorage.getItem('local_guest_uid');
   if (!localGuestUid) {
@@ -415,7 +486,7 @@ export async function loginAsGuest(guestName: string): Promise<UserProfile> {
   const nowIso = new Date().toISOString();
   const localProfile: UserProfile = {
     uid: localGuestUid,
-    displayName: guestName,
+    displayName: trimmed,
     isOnline: true,
     lastSeen: nowIso,
     isAdFree: guestAdFree,
@@ -541,16 +612,17 @@ export async function cleanupGuestUsersAdmin(): Promise<{ deletedCount: number }
 
     snap.forEach((docSnap) => {
       const data = docSnap.data() as UserProfile;
-      const isGuest = !data.email || data.uid.startsWith('guest_') || data.uid === 'guest_user';
+      const isGuest = !data.email || docSnap.id.startsWith('guest_') || docSnap.id === 'guest_user' || (data.uid && data.uid.startsWith('guest_'));
       if (isGuest) {
         deletedCount++;
-        deletePromises.push(deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {}));
+        deletePromises.push(deleteDoc(doc(db, 'users', docSnap.id)));
       }
     });
 
     await Promise.all(deletePromises);
     return { deletedCount };
   } catch (err) {
+    console.error('Error in cleanupGuestUsersAdmin:', err);
     handleFirestoreError(err, OperationType.DELETE, 'users');
     return { deletedCount: 0 };
   }
